@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   if (maxBudget) {
     const budget = parseInt(maxBudget, 10);
     if (!isNaN(budget)) {
-      query = query.lte("cost_min", budget);
+      query = query.lte("cost_max", budget);
       filtersApplied.max_budget = budget;
     }
   }
@@ -111,3 +111,59 @@ export async function GET(req: NextRequest) {
     hospitals,
   });
 }
+
+export async function POST(req: NextRequest) {
+  // 1. Verify admin
+  const supabase = await createServerClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    
+    // 2. Format for db
+    const newHospital = {
+      hospital_id: `HOSP-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      name: body.name,
+      city: body.city,
+      state: body.state,
+      pincode: body.pincode || "000000",
+      address: body.address || "",
+      latitude: parseFloat(body.latitude) || 0,
+      longitude: parseFloat(body.longitude) || 0,
+      specialties: body.specialties ? body.specialties.split(',').map((s:string) => s.trim()) : [],
+      procedures: [],
+      cost_min: parseInt(body.cost_min) || 0,
+      cost_max: parseInt(body.cost_max) || 0,
+      currency: 'INR',
+      facilities: body.facilities ? body.facilities.split(',').map((f:string) => f.trim()) : [],
+      accreditation: body.accreditation ? body.accreditation.split(',').map((a:string) => a.trim()) : [],
+      pmjay_empanelled: !!body.pmjay_empanelled,
+      annual_procedure_volume: parseInt(body.annual_procedure_volume) || 0,
+      icu_beds: parseInt(body.icu_beds) || 0,
+      
+      // Strict demo data provenance
+      source_type: 'synthetic',
+      verification_status: 'simulated',
+      data_status: 'synthetic_demo_data',
+      review_status: 'approved', // auto-approve admin uploads
+      last_updated: new Date().toISOString(),
+      condition_tag: body.specialties // fallback
+    };
+
+    const { error } = await supabaseAdmin.from("hospitals").insert(newHospital);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, hospital: newHospital });
+  } catch (error) {
+    console.error("[POST /api/hospitals] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to add hospital" },
+      { status: 500 }
+    );
+  }
+}
+

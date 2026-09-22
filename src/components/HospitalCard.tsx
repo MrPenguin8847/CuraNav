@@ -45,8 +45,8 @@ export function HospitalCard({
   const shownFacilities = facilities.slice(0, 4);
   const hiddenCount = facilities.length - shownFacilities.length;
 
-  const formatCost = (n: number) =>
-    `₹${(n / 100000).toFixed(n % 100000 === 0 ? 0 : 1)} L`;
+  const formatCost = (n: number | null) =>
+    n != null ? `₹${(n / 100000).toFixed(n % 100000 === 0 ? 0 : 1)} L` : null;
 
   const matchingSpecialty = specialties[0] ?? "General";
 
@@ -58,7 +58,7 @@ export function HospitalCard({
   ].filter(Boolean) as string[];
 
   const handleCompareClick = () => {
-    if (!isSelected && compareCount >= 3) return;
+    if (!isSelected && compareCount >= 5) return;
     onToggleCompare(hospitalId);
   };
 
@@ -95,7 +95,7 @@ export function HospitalCard({
           <h3 className="text-lg font-bold text-foreground leading-snug">{name}</h3>
           <div className="flex items-center gap-1 mt-1 text-sm text-muted">
             <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{city}</span>
+            <span>{city ?? hospital.address ?? "India"}</span>
           </div>
         </div>
 
@@ -113,9 +113,11 @@ export function HospitalCard({
         <IndianRupee className="w-4 h-4 text-primary flex-shrink-0" />
         <div>
           <p className="text-xl font-extrabold text-foreground tracking-tight">
-            {formatCost(costMin)} – {formatCost(costMax)}
+            {costMin != null && costMax != null
+              ? `${formatCost(costMin)} – ${formatCost(costMax)}`
+              : pmjayEmpanelled ? "Standard PM-JAY Rates" : "Contact for pricing"}
           </p>
-          <p className="text-xs text-muted">Indicative cost range</p>
+          <p className="text-xs text-muted">{costMin != null ? "Indicative cost range" : pmjayEmpanelled ? "Rates strictly follow Govt PM-JAY packages" : "Pricing not available"}</p>
         </div>
       </div>
 
@@ -142,7 +144,9 @@ export function HospitalCard({
 
       {/* Annual volume — muted trust signal */}
       <p className="text-xs text-muted mb-4">
-        {annualProcedureVolume.toLocaleString("en-IN")} procedures/year · Data source:{" "}
+        {annualProcedureVolume != null
+          ? `${annualProcedureVolume.toLocaleString("en-IN")} procedures/year · `
+          : ""}Data source:{" "}
         <span className="capitalize font-medium">{sourceType}</span>
       </p>
 

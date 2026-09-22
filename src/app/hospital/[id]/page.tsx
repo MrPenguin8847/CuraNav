@@ -137,9 +137,9 @@ export default async function HospitalDetailPage({
     outcomeMetric,
   } = {
     ...hospital,
-    // Fields that exist in DB but aren't in root Hospital type — guard gracefully
-    phone: (hospital as unknown as Record<string, unknown>).phone as string | undefined ?? "Contact hospital directly",
-    emergencyAvailable: (hospital as unknown as Record<string, unknown>).emergencyAvailable as boolean | undefined ?? true,
+    // Fields that exist in DB — guard gracefully
+    phone: hospital.phone ?? "Contact hospital directly",
+    emergencyAvailable: hospital.specialties?.some(s => s.includes("Emergency")) ?? false,
     latitude: hospital.latitude,
     longitude: hospital.longitude,
     procedures: hospital.procedures ?? [],
@@ -148,7 +148,9 @@ export default async function HospitalDetailPage({
     outcomeMetric: hospital.outcomeMetric ?? "",
   };
 
-  const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+  const mapsUrl = (latitude != null && longitude != null)
+    ? `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(name + ' ' + (address ?? ''))}`;
   const matchingSpecialty = specialties[0] ?? "General";
 
   return (
@@ -192,7 +194,7 @@ export default async function HospitalDetailPage({
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted mb-6">
             <span className="inline-flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-              {city}
+              {city ?? hospital.address ?? "India"}
             </span>
             <span className="inline-block px-2.5 py-0.5 bg-primary/10 text-primary text-xs font-semibold rounded-full">
               {matchingSpecialty}
@@ -268,7 +270,7 @@ export default async function HospitalDetailPage({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline"
                   >
-                    View on Google Maps
+                    Get Directions
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </dd>
@@ -333,20 +335,25 @@ export default async function HospitalDetailPage({
             <IndianRupee className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
             <div>
               <p className="text-3xl font-extrabold text-foreground tracking-tight">
-                {formatCost(costMin)} – {formatCost(costMax)}
+                {costMin != null && costMax != null
+                  ? `${formatCost(costMin)} – ${formatCost(costMax)}`
+                  : pmjayEmpanelled ? "Standard PM-JAY Rates" : "Contact hospital for pricing"}
               </p>
               <p className="text-xs text-muted mt-1.5 leading-relaxed">
-                Indicative cost — actual pricing may vary with patient condition, package inclusions, doctor fees,
-                consumables, and availability. Confirm with hospital before making any financial decision.
+                {costMin != null
+                  ? "Indicative cost — actual pricing may vary with patient condition, package inclusions, doctor fees, consumables, and availability. Confirm with hospital before making any financial decision."
+                  : pmjayEmpanelled ? "Rates strictly follow Government PM-JAY standard packages for eligible beneficiaries." : "Cost data not available from NHA. Contact the hospital directly for pricing."}
               </p>
             </div>
           </div>
-          <p className="text-xs text-muted">
-            Procedures/year (reported):{" "}
-            <span className="font-semibold text-foreground">
-              {annualProcedureVolume.toLocaleString("en-IN")}
-            </span>
-          </p>
+          {annualProcedureVolume != null && annualProcedureVolume > 0 && (
+            <p className="text-xs text-muted">
+              Procedures/year (reported):{" "}
+              <span className="font-semibold text-foreground">
+                {annualProcedureVolume.toLocaleString("en-IN")}
+              </span>
+            </p>
+          )}
         </Section>
 
         {/* ── 6. TRUST PANEL ── */}

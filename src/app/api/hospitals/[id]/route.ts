@@ -88,3 +88,41 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 }
+
+/**
+ * DELETE /api/hospitals/[id]
+ *
+ * Deletes the hospital.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  try {
+    const supabase = await createServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 401 }
+      );
+    }
+
+    const { error } = await supabaseAdmin
+      .from("hospitals")
+      .delete()
+      .eq("hospital_id", id);
+
+    if (error) {
+      console.error(`[DELETE /api/hospitals/${id}] Supabase error:`, error.message);
+      return NextResponse.json({ error: "Failed to delete hospital", detail: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to delete hospital" }, { status: 500 });
+  }
+}

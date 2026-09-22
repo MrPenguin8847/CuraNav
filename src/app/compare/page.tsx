@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, Suspense, useState, useEffect } from "react";
+import { useMemo, Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -14,6 +14,8 @@ import {
   BedDouble,
   Activity,
   SearchX,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -23,12 +25,65 @@ import { Hospital } from "@/lib/mockHospitals";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const formatCost = (n: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+/** Lightweight markdown → HTML for the AI summary. Handles headings, bold, lists, tables, and paragraphs. */
+function renderMarkdown(md: string): string {
+  const escaped = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  let html = escaped
+    // Headings
+    .replace(/^#### (.+)$/gm, "<h4>$1</h4>")
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    // Bold and italic
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    // Horizontal rules
+    .replace(/^---$/gm, "<hr/>")
+    // Unordered lists
+    .replace(/^- (.+)$/gm, "<li>$1</li>")
+    // Table rows
+    .replace(/^\|(.+)\|$/gm, (_, row: string) => {
+      const cells = row.split("|").map((c: string) => c.trim());
+      return "<tr>" + cells.map((c: string) => `<td>${c}</td>`).join("") + "</tr>";
+    })
+    // Separator rows (|---|---|)
+    .replace(/<tr><td>[-:\s]+<\/td>.*?<\/tr>/g, "");
+
+  // Wrap consecutive <li> in <ul>
+  html = html.replace(/((?:<li>.*?<\/li>\s*)+)/g, "<ul>$1</ul>");
+
+  // Wrap consecutive <tr> in <table>
+  html = html.replace(/((?:<tr>.*?<\/tr>\s*)+)/g, "<table>$1</table>");
+
+  // Convert remaining newlines to <br> for paragraphs
+  html = html.replace(/\n{2,}/g, "</p><p>");
+  html = `<p>${html}</p>`;
+  // Clean up empty paragraphs
+  html = html.replace(/<p>\s*<\/p>/g, "");
+  html = html.replace(/<p>\s*(<h[1-4]>)/g, "$1");
+  html = html.replace(/(<\/h[1-4]>)\s*<\/p>/g, "$1");
+  html = html.replace(/<p>\s*(<ul>)/g, "$1");
+  html = html.replace(/(<\/ul>)\s*<\/p>/g, "$1");
+  html = html.replace(/<p>\s*(<table>)/g, "$1");
+  html = html.replace(/(<\/table>)\s*<\/p>/g, "$1");
+  html = html.replace(/<p>\s*(<hr\/>)/g, "$1");
+  html = html.replace(/(<hr\/>)\s*<\/p>/g, "$1");
+
+  return html;
+}
+
+const formatCost = (n: number | null) =>
+  n != null
+    ? new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      }).format(n)
+    : null;
 
 /** Returns index of the "best" value in an array (lowest or highest). */
 function bestIndex(values: (number | null)[], prefer: "low" | "high"): number {
@@ -144,7 +199,7 @@ function MobileCard({
         </h3>
         <div className="flex items-center gap-1 mt-1 text-sm text-muted">
           <MapPin className="w-3.5 h-3.5" />
-          {hospital.city}
+          {hospital.city ?? hospital.address ?? "India"}
         </div>
       </div>
 
@@ -152,7 +207,7 @@ function MobileCard({
       <dl className="space-y-3 text-sm">
         <MetricRow
           label="Indicative cost"
-          value={`${formatCost(hospital.costMin)} – ${formatCost(hospital.costMax)}`}
+          value={hospital.costMin != null && hospital.costMax != null ? `${formatCost(hospital.costMin)} – ${formatCost(hospital.costMax)}` : "N/A"}
           highlight={rank.cost}
           note="lowest min"
         />
@@ -162,7 +217,7 @@ function MobileCard({
         />
         <MetricRow
           label="Procedures/year"
-          value={`${hospital.annualProcedureVolume.toLocaleString("en-IN")} (reported)`}
+          value={hospital.annualProcedureVolume != null ? `${hospital.annualProcedureVolume.toLocaleString("en-IN")} (reported)` : "N/A"}
           highlight={rank.volume}
           note="highest"
         />
@@ -181,7 +236,7 @@ function MobileCard({
         />
         <MetricRow
           label="ICU beds"
-          value={`${hospital.icuBeds} (indicative)`}
+          value={hospital.icuBeds != null ? `${hospital.icuBeds} (indicative)` : "N/A"}
           highlight={rank.icu}
           note="most"
         />
@@ -271,7 +326,7 @@ function ComparePageInner() {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
-        .slice(0, 3),
+        .slice(0, 5),
     [idsParam]
   );
 
@@ -331,6 +386,32 @@ function ComparePageInner() {
     );
   }
 
+  // ── AI Comparison state ──────────────────────────────────────────────────────
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const generateAiSummary = useCallback(async () => {
+    if (hospitals.length < 2) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiSummary(null);
+    try {
+      const res = await fetch("/api/compare/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: hospitals.map((h) => h.hospitalId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "AI comparison failed");
+      setAiSummary(data.comparison);
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [hospitals]);
+
   // Need at least 2 resolved hospitals for a meaningful comparison
   if (hospitals.length < 2) return <EmptyCompare />;
 
@@ -347,7 +428,7 @@ function ComparePageInner() {
   const n = hospitals.length;
 
   // Column width class for the table
-  const colClass = n === 2 ? "w-1/2" : "w-1/3";
+  const colClass = n === 2 ? "w-1/2" : n === 3 ? "w-1/3" : n === 4 ? "w-1/4" : "w-1/5";
 
   return (
     <div className="min-h-screen flex flex-col bg-background font-sans">
@@ -366,6 +447,69 @@ function ComparePageInner() {
           <h1 className="text-2xl md:text-3xl font-extrabold text-foreground">
             Comparing {n} Hospital{n > 1 ? "s" : ""}
           </h1>
+        </div>
+
+        {/* ── AI COMPARISON SECTION ── */}
+        <div className="mb-6">
+          {!aiSummary && !aiLoading && (
+            <button
+              onClick={generateAiSummary}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white font-semibold rounded-xl px-6 py-3 text-sm hover:opacity-90 transition-opacity shadow-md shadow-primary/25"
+            >
+              <Sparkles className="w-4 h-4" />
+              Generate AI Comparison Summary
+            </button>
+          )}
+
+          {aiLoading && (
+            <div className="card p-6 border-2 border-primary/20 bg-primary/5">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">AI is analyzing your hospitals…</p>
+                  <p className="text-xs text-muted">This may take a few seconds</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {aiError && (
+            <div className="card p-5 border-2 border-warning/30 bg-warning/5">
+              <p className="text-sm text-warning font-medium mb-2">⚠️ {aiError}</p>
+              <button
+                onClick={generateAiSummary}
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {aiSummary && (
+            <div className="card p-6 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <h2 className="text-base font-bold text-foreground">AI Comparison Summary</h2>
+              </div>
+              <div
+                className="prose prose-sm max-w-none text-foreground
+                  prose-headings:text-foreground prose-headings:font-bold
+                  prose-strong:text-foreground prose-a:text-primary
+                  prose-table:text-sm prose-th:bg-slate-50 prose-th:p-2 prose-td:p-2
+                  prose-th:border prose-td:border prose-th:border-border prose-td:border-border"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(aiSummary) }}
+              />
+              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                <p className="text-xs text-muted">Generated by AI · Not a medical recommendation</p>
+                <button
+                  onClick={generateAiSummary}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Regenerate
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Disclaimer caption */}
@@ -405,7 +549,7 @@ function ComparePageInner() {
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted">
                         <MapPin className="w-3 h-3" />
-                        {h.city}
+                        {h.city ?? h.address ?? "India"}
                       </div>
                       <Link
                         href={`/hospital/${h.hospitalId}`}
@@ -427,7 +571,7 @@ function ComparePageInner() {
                   cells={hospitals.map((h, i) => (
                     <div key={i}>
                       <p className={`font-bold ${i === costBest ? "text-success" : ""}`}>
-                        {formatCost(h.costMin)} – {formatCost(h.costMax)}
+                        {h.costMin != null && h.costMax != null ? `${formatCost(h.costMin)} – ${formatCost(h.costMax)}` : "N/A"}
                         {i === costBest && (
                           <span className="ml-1 text-xs font-medium text-success/70">(lowest)</span>
                         )}
@@ -452,8 +596,8 @@ function ComparePageInner() {
                   highlightIdx={volumeBest}
                   cells={hospitals.map((h, i) => (
                     <span key={i} className={i === volumeBest ? "text-success font-semibold" : ""}>
-                      {h.annualProcedureVolume.toLocaleString("en-IN")}
-                      <span className="text-xs text-muted font-normal ml-1">(reported)</span>
+                      {h.annualProcedureVolume != null ? h.annualProcedureVolume.toLocaleString("en-IN") : "N/A"}
+                      {h.annualProcedureVolume != null && <span className="text-xs text-muted font-normal ml-1">(reported)</span>}
                       {i === volumeBest && (
                         <span className="ml-1 text-xs font-medium text-success/70">(highest)</span>
                       )}
@@ -522,8 +666,8 @@ function ComparePageInner() {
                       className={`inline-flex items-center gap-1.5 ${i === icuBest ? "text-success font-semibold" : ""}`}
                     >
                       <BedDouble className="w-3.5 h-3.5 text-primary" />
-                      {h.icuBeds}
-                      <span className="text-xs text-muted font-normal">(indicative)</span>
+                      {h.icuBeds != null ? h.icuBeds : "N/A"}
+                      {h.icuBeds != null && <span className="text-xs text-muted font-normal">(indicative)</span>}
                       {i === icuBest && (
                         <span className="text-xs font-medium text-success/70">(most)</span>
                       )}

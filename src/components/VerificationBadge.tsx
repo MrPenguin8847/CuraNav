@@ -26,8 +26,8 @@ export function VerificationBadge({ status, lastVerified }: VerificationBadgePro
     simulated: {
       icon: FlaskConical,
       label: "Simulated Demo Data",
-      className: "bg-muted/10 text-muted border-muted/20",
-      iconClass: "text-muted",
+      className: "bg-primary/10 text-primary border-primary/20",
+      iconClass: "text-primary",
     },
   };
 

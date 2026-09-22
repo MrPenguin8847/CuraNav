@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Hospital, ReviewStatus } from "@/lib/mockHospitals";
-import { Check, X, Clock, Database, AlertCircle, FileText, LogOut } from "lucide-react";
+import { Check, X, Clock, Database, AlertCircle, FileText, LogOut, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
+import { AddHospitalModal } from "./AddHospitalModal";
 
 export default function AdminDashboard() {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ReviewStatus | "all">("all");
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
 
   const fetchHospitals = async () => {
@@ -57,6 +59,27 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this hospital? This action cannot be undone.")) return;
+    
+    // Optimistic UI update
+    setHospitals((prev) => prev.filter((h) => h.hospitalId !== id));
+
+    try {
+      const res = await fetch(`/api/hospitals/${id}`, {
+        method: "DELETE",
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to delete hospital");
+      }
+    } catch (err) {
+      console.error(err);
+      // Revert on failure by refetching
+      fetchHospitals();
+    }
+  };
+
   const filteredHospitals = hospitals.filter(
     (h) => filter === "all" || h.reviewStatus === filter
   );
@@ -82,13 +105,22 @@ export default function AdminDashboard() {
               Review and curate hospital records before they appear in public search results.
             </p>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shadow-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded-xl font-medium transition-colors text-sm shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Hospital
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shadow-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -182,12 +214,19 @@ export default function AdminDashboard() {
                           {hospital.reviewStatus !== "rejected" && (
                             <button
                               onClick={() => handleUpdateStatus(hospital.hospitalId, "rejected")}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-600 hover:bg-red-200 font-semibold rounded-lg transition-colors"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-warning/10 text-warning hover:bg-warning/20 font-semibold rounded-lg transition-colors"
                             >
                               <X className="w-4 h-4" />
                               Reject
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDelete(hospital.hospitalId)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-600 hover:bg-red-200 font-semibold rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -198,6 +237,15 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+      
+      <AddHospitalModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={() => {
+          setIsModalOpen(false);
+          fetchHospitals();
+        }}
+      />
       
       <Footer />
     </div>

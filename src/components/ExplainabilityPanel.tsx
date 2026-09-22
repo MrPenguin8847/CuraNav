@@ -2,25 +2,20 @@
 
 import { MapPin, IndianRupee, Stethoscope, Target, PencilLine } from "lucide-react";
 
-// Mock extracted intent matching the kidney/Chandigarh/₹2L/dialysis example
-export const MOCK_EXTRACTED_INTENT = {
-  query: "kidney treatment near Chandigarh under ₹2 lakh with dialysis",
-  chips: [
-    { icon: "🩺", label: "Condition", value: "Kidney Disease" },
-    { icon: "⚕️", label: "Specialty", value: "Nephrology" },
-    { icon: "📍", label: "Location", value: "Chandigarh, within 100 km" },
-    { icon: "💰", label: "Budget", value: "Up to ₹2,00,000" },
-    { icon: "🏥", label: "Facility", value: "Dialysis required" },
-    { icon: "🎯", label: "Priority", value: "Best match" },
-  ],
-};
+
 
 interface ExplainabilityPanelProps {
   onEditSearch: () => void;
+  explanation: {
+    query: string;
+    chips: { icon: string; label: string; value: string }[];
+  } | null;
 }
 
-export function ExplainabilityPanel({ onEditSearch }: ExplainabilityPanelProps) {
-  const { query, chips } = MOCK_EXTRACTED_INTENT;
+export function ExplainabilityPanel({ onEditSearch, explanation }: ExplainabilityPanelProps) {
+  if (!explanation) return null;
+
+  const { query, chips } = explanation;
 
   return (
     <div className="bg-primary/5 border border-primary/15 rounded-2xl p-4 md:p-5">

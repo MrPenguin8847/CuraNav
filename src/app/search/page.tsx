@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { LoadingState } from "@/components/LoadingState";
 import { Hospital } from "@/lib/mockHospitals";
 import { Suspense } from "react";
+import { ManualFilters } from "@/components/ManualFilters";
 
 type SortKey = "match" | "cost" | "distance" | "verified";
 
@@ -38,6 +39,7 @@ function SearchResultsInner() {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [explanation, setExplanation] = useState<{ query: string; chips: any[] } | null>(null);
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [sort, setSort] = useState<SortKey>("match");
@@ -45,50 +47,30 @@ function SearchResultsInner() {
   const [compareWarning, setCompareWarning] = useState(false);
 
   // ── Fetch from /api/hospitals ─────────────────────────────────────────────
-  // Build query params from the raw natural-language string.
-  // In production, this would call a /api/search/natural-language endpoint first
-  // to extract structured filters; for now we do a simple fallback parse.
   const fetchHospitals = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Start with all explicit query parameters from the URL
       const params = new URLSearchParams(searchParams.toString());
-      // Remove 'q' as it's not a real backend filter
       params.delete("q");
 
-      const q = rawQuery.toLowerCase();
-
-      // Condition / specialty heuristics (only if not explicitly set)
-      if (!params.has("condition") && !params.has("specialty")) {
-        if (q.includes("kidney") || q.includes("nephro") || q.includes("dialysis")) {
-          params.set("condition", "kidney disease");
-        } else if (q.includes("heart") || q.includes("cardiac") || q.includes("cardio")) {
-          params.set("condition", "heart disease");
-        } else if (q.includes("cancer") || q.includes("oncol") || q.includes("tumour")) {
-          params.set("condition", "cancer");
-        } else if (q.includes("bone") || q.includes("joint") || q.includes("ortho") || q.includes("fracture")) {
-          params.set("condition", "orthopaedic conditions");
-        } else if (q.includes("pregnan") || q.includes("matern") || q.includes("deliver")) {
-          params.set("condition", "maternity");
-        } else if (q.includes("emergency") || q.includes("trauma")) {
-          params.set("condition", "emergency care");
-        }
-      }
-
-      // City extraction (only if not explicitly set)
-      if (!params.has("city")) {
-        const cities = ["chandigarh", "mohali", "panchkula", "ludhiana", "jalandhar", "delhi"];
-        const foundCity = cities.find((c) => q.includes(c));
-        if (foundCity) params.set("city", foundCity.charAt(0).toUpperCase() + foundCity.slice(1));
-      }
-
-      // Budget extraction (only if not explicitly set)
-      if (!params.has("max_budget")) {
-        const budgetMatch = q.match(/(?:under\s+)?(?:₹\s*)?(\d+(?:\.\d+)?)\s*(?:lakh|l\b)/);
-        if (budgetMatch) {
-          const lakhs = parseFloat(budgetMatch[1]);
-          params.set("max_budget", String(Math.round(lakhs * 100000)));
+      if (rawQuery) {
+        // Call natural language API
+        const nlRes = await fetch("/api/search/natural-language", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: rawQuery })
+        });
+        
+        if (nlRes.ok) {
+          const nlData = await nlRes.json();
+          setExplanation(nlData.explanation);
+          
+          if (nlData.filters.condition) params.set("condition", nlData.filters.condition);
+          if (nlData.filters.specialty) params.set("specialty", nlData.filters.specialty);
+          if (nlData.filters.city) params.set("city", nlData.filters.city);
+          if (nlData.filters.max_budget) params.set("max_budget", nlData.filters.max_budget);
+          if (nlData.filters.facilities) params.set("facilities", nlData.filters.facilities);
         }
       }
 
@@ -113,10 +95,19 @@ function SearchResultsInner() {
     const arr = [...hospitals];
     switch (sort) {
       case "cost":
-        return arr.sort((a, b) => a.costMin - b.costMin);
+        return arr.sort((a, b) => {
+          if (a.costMin == null && b.costMin == null) return 0;
+          if (a.costMin == null) return 1; // nulls at the end
+          if (b.costMin == null) return -1;
+          return a.costMin - b.costMin;
+        });
       case "distance":
-        // No distance_km in new schema; fall back to city alphabetical
-        return arr.sort((a, b) => a.city.localeCompare(b.city));
+        // No distance_km in new schema; fall back to city/address alphabetical
+        return arr.sort((a, b) => {
+          const locA = a.city ?? a.address ?? "";
+          const locB = b.city ?? b.address ?? "";
+          return locA.localeCompare(locB);
+        });
       case "verified":
         return arr.sort(
           (a, b) =>
@@ -138,7 +129,7 @@ function SearchResultsInner() {
   const handleToggleCompare = (id: string) => {
     setSelectedIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 3) {
+      if (prev.length >= 5) {
         setCompareWarning(true);
         setTimeout(() => setCompareWarning(false), 3000);
         return prev;
@@ -172,8 +163,11 @@ function SearchResultsInner() {
 
         {/* ── 1. EXPLAINABILITY PANEL ── */}
         <section className="mb-6" aria-label="Search interpretation">
-          <ExplainabilityPanel onEditSearch={handleEditSearch} />
+          <ExplainabilityPanel onEditSearch={handleEditSearch} explanation={explanation} />
         </section>
+
+        {/* ── MANUAL FILTERS ── */}
+        <ManualFilters />
 
         {/* ── 2. RESULTS TOOLBAR ── */}
         {!isLoading && !error && (
@@ -212,7 +206,7 @@ function SearchResultsInner() {
         {compareWarning && (
           <div className="mb-4 px-4 py-3 bg-warning/10 border border-warning/20 rounded-xl text-sm font-medium text-warning flex items-center gap-2">
             <span>⚠️</span>
-            <span>You can compare up to 3 hospitals at a time. Remove one to add another.</span>
+            <span>You can compare up to 5 hospitals at a time. Remove one to add another.</span>
           </div>
         )}
 
