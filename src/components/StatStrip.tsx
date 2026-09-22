@@ -1,47 +1,53 @@
-import { Building2, FlaskConical, CheckCircle, Sparkles } from "lucide-react";
+import { Building2, Stethoscope, CheckCircle, Sparkles } from "lucide-react";
 
 const stats = [
   {
     icon: Building2,
     value: "25+",
     label: "Hospitals Listed",
+    color: "text-primary bg-primary/10",
   },
   {
-    icon: FlaskConical,
-    value: "6",
-    label: "Conditions Covered",
+    icon: Stethoscope,
+    value: "50+",
+    label: "Expert Doctors",
+    color: "text-blue-600 bg-blue-100",
   },
   {
     icon: CheckCircle,
     value: "100%",
-    label: "Transparent Data Labeling",
+    label: "Transparent Data",
+    color: "text-green-600 bg-green-100",
   },
   {
     icon: Sparkles,
     value: "AI",
-    label: "Assisted Search",
+    label: "Powered Search",
+    color: "text-amber-600 bg-amber-100",
   },
 ];
 
 export function StatStrip() {
   return (
-    <section className="py-10 bg-white border-y border-border">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 divide-y-2 md:divide-y-0 md:divide-x divide-slate-100">
-          {stats.map(({ icon: Icon, value, label }) => (
+    <section className="py-6 bg-white border-y border-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          {stats.map(({ icon: Icon, value, label, color }) => (
             <div
               key={label}
-              className="flex flex-col items-center text-center py-4 md:py-0 md:px-6 first:pt-0 last:pb-0"
+              className="flex items-center gap-4 py-4"
             >
-              <div className="w-8 h-8 mb-2 flex items-center justify-center text-primary/70">
-                <Icon className="w-5 h-5" />
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+                <Icon className="w-6 h-6" />
               </div>
-              <p className="text-2xl font-extrabold text-foreground tracking-tight">
-                {value}
-              </p>
-              <p className="text-xs text-muted font-medium mt-0.5 max-w-[120px]">
-                {label}
-              </p>
+              <div>
+                <p className="text-2xl font-extrabold text-foreground tracking-tight leading-none">
+                  {value}
+                </p>
+                <p className="text-sm text-muted font-medium mt-0.5">
+                  {label}
+                </p>
+              </div>
             </div>
           ))}
         </div>

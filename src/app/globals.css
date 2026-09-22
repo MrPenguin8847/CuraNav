@@ -2,19 +2,64 @@
 
 @theme {
   --color-primary: #5b4b8a;
+  --color-primary-dark: #4a3d72;
   --color-primary-light: #f3f0fb;
+  --color-primary-lighter: #f8f6fd;
   --color-secondary: #8e7cc3;
+  --color-accent: #7c6bb5;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-muted: #64748b;
-  
-  --color-background: #f8fafc;
+
+  --color-background: #ffffff;
   --color-foreground: #0f172a;
   --color-card: #ffffff;
-  --color-border: #e2e8f0;
+  --color-border: #e8e4f0;
+  --color-section-alt: #f8f6fd;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --animate-fade-in: fade-in 0.6s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.6s ease-out both;
+  --animate-slide-in-left: slide-in-left 0.7s ease-out both;
+  --animate-slide-in-right: slide-in-right 0.7s ease-out both;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-soft: pulse-soft 3s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -29,16 +74,32 @@ body {
   .card {
     @apply bg-card rounded-2xl shadow-sm border border-border;
   }
-  
+
   .btn-primary {
-    @apply bg-primary text-white rounded-full px-6 py-2 font-medium hover:opacity-90 transition-opacity;
+    @apply bg-primary text-white rounded-full px-6 py-2.5 font-semibold hover:bg-primary-dark transition-all duration-200 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30;
   }
-  
+
   .btn-secondary {
-    @apply bg-primary-light text-primary rounded-full px-6 py-2 font-medium hover:bg-primary/20 transition-colors;
+    @apply bg-primary-light text-primary rounded-full px-6 py-2.5 font-semibold hover:bg-primary/15 transition-all duration-200;
   }
-  
+
   .btn-ghost {
     @apply bg-transparent text-slate-600 rounded-full px-4 py-2 font-medium hover:bg-slate-100 transition-colors;
+  }
+
+  .btn-outline {
+    @apply bg-transparent border-2 border-primary text-primary rounded-full px-6 py-2 font-semibold hover:bg-primary hover:text-white transition-all duration-200;
+  }
+
+  .section-padding {
+    @apply py-16 md:py-24;
+  }
+
+  .section-alt {
+    @apply bg-section-alt;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
   }
 }
