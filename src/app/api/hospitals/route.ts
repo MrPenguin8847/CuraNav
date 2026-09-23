@@ -261,6 +261,7 @@ export async function GET(req: NextRequest) {
           const geoLon = parseFloat(geocodeData[0].lon);
           
           if (!isNaN(geoLat) && !isNaN(geoLon)) {
+            coords = { lat: geoLat, lon: geoLon };
             // Re-fetch ALL approved hospitals (no city text filter)
             let retryQuery = supabaseAdmin.from("hospitals").select("*");
             if (!isAdmin) {
@@ -292,8 +293,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── Sort by Success Rate ──────────────────────────────────────────────────
-  if (resolvedSpecialty) {
+  // ── Sort: nearest-first when we have coordinates, else by success rate ────
+  if (coords && !isNaN(coords.lat) && !isNaN(coords.lon)) {
+    // Show the nearest hospitals at the top ("near me" / radius searches)
+    hospitals.sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
+  } else if (resolvedSpecialty) {
     const targetSpecs = resolvedSpecialty.split(',').map(s => s.trim()).filter(Boolean);
     if (targetSpecs.length > 0) {
       hospitals.sort((a, b) => {

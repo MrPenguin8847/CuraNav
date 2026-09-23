@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Search, MapPin, Stethoscope, IndianRupee, Activity, Loader2, Pill, Info } from "lucide-react";
 import { getEstimatedCost } from "@/lib/costEstimator";
+import { getStoredLocation, storeLocation } from "@/lib/userLocation";
 
 export default function FindHospitalPage() {
   const router = useRouter();
@@ -15,6 +16,19 @@ export default function FindHospitalPage() {
   const [specialty, setSpecialty] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
   const [locating, setLocating] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+
+  // Restore the user's saved location so it can be sent with the search.
+  useEffect(() => {
+    const saved = getStoredLocation();
+    if (saved) {
+      setLocationCoords({ lat: saved.lat, lon: saved.lon });
+      setLocationLabel(saved.label);
+      const savedCity = saved.label.split(",")[0].trim();
+      if (savedCity) setCity(savedCity);
+    }
+  }, []);
 
   // Basic facilities check
   const [facilities, setFacilities] = useState({
@@ -61,7 +75,14 @@ export default function FindHospitalPage() {
             data.address?.village ??
             data.address?.county ??
             "";
-          if (detectedCity) setCity(detectedCity);
+          if (detectedCity) {
+            setCity(detectedCity);
+            const state = data.address?.state ?? "";
+            const label = [detectedCity, state].filter(Boolean).join(", ");
+            setLocationLabel(label);
+            setLocationCoords({ lat: latitude, lon: longitude });
+            storeLocation({ lat: latitude, lon: longitude, label });
+          }
         } catch { }
         finally { setLocating(false); }
       },
@@ -81,6 +102,18 @@ export default function FindHospitalPage() {
     if (city.trim()) params.set("city", city.trim());
     if (specialty.trim()) params.set("specialty", specialty.trim());
     if (maxBudget.trim()) params.set("max_budget", maxBudget.trim());
+
+    // Attach the user's coordinates when the city matches their location, so the
+    // nearest hospitals are shown.
+    if (
+      city.trim() &&
+      locationCoords &&
+      locationLabel &&
+      locationLabel.toLowerCase().includes(city.trim().toLowerCase())
+    ) {
+      params.set("lat", locationCoords.lat.toString());
+      params.set("lon", locationCoords.lon.toString());
+    }
 
     const selectedFacilities = Object.entries(facilities)
       .filter(([_, isSelected]) => isSelected)

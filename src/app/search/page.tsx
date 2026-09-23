@@ -15,6 +15,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { Hospital } from "@/lib/mockHospitals";
 import { Suspense } from "react";
 import { ManualFilters } from "@/components/ManualFilters";
+import { getStoredLocation, storeLocation } from "@/lib/userLocation";
 
 type SortKey = "match" | "cost" | "distance" | "verified";
 
@@ -53,6 +54,7 @@ function SearchResultsInner() {
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const [locating, setLocating] = useState(false);
   const [pendingNlData, setPendingNlData] = useState<any>(null);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const router = useRouter();
 
   // ── Fetch from /api/hospitals ─────────────────────────────────────────────
@@ -63,18 +65,29 @@ function SearchResultsInner() {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("q");
       params.delete("loc");
+      params.delete("lat");
+      params.delete("lon");
 
       let fallbackCities: string[] = [];
 
+      // Resolve the user's location from URL params or their saved location so it
+      // can be sent with this request (and every subsequent search).
+      const storedLoc = typeof window !== "undefined" ? getStoredLocation() : null;
+      const urlLoc = searchParams.get("loc");
+      const urlLat = searchParams.get("lat");
+      const urlLon = searchParams.get("lon");
+      const locSkipped = urlLoc === "skip";
+      const effectiveLoc =
+        urlLoc && urlLoc !== "skip" ? urlLoc : storedLoc?.label ?? null;
+
       if (rawQuery) {
         // Call natural language API
-        const locParam = searchParams.get("loc");
         const nlRes = await fetch("/api/search/natural-language", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: rawQuery,
-            locationContext: locParam
+            locationContext: effectiveLoc
           })
         });
 
@@ -85,7 +98,7 @@ function SearchResultsInner() {
 
           // Detect location-intent queries that need geolocation
           const queryLower = rawQuery.toLowerCase();
-          const needsLocation = (queryLower.includes("near me") || queryLower.includes("nearby") || queryLower.includes("closest") || queryLower.includes("nearest")) && !searchParams.get("loc") && !nlData.filters.city;
+          const needsLocation = (queryLower.includes("near me") || queryLower.includes("nearby") || queryLower.includes("closest") || queryLower.includes("nearest")) && !effectiveLoc && !nlData.filters.city;
 
           if (needsLocation) {
             setPendingNlData(nlData);
@@ -118,6 +131,25 @@ function SearchResultsInner() {
             max_budget: nlData.filters.max_budget ?? null,
             facilities: nlData.filters.facilities ?? null,
           });
+        }
+      }
+
+      // Send the user's coordinates with every search request so "near me"
+      // searches match against hospital lat/lng and return nearest hospitals first.
+      if (!locSkipped) {
+        const coords =
+          urlLat && urlLon
+            ? { lat: urlLat, lon: urlLon }
+            : storedLoc
+              ? { lat: String(storedLoc.lat), lon: String(storedLoc.lon) }
+              : null;
+
+        // Only apply coordinates when the search isn't pinned to an explicit city name,
+        // otherwise the DB city-name match would be skipped for nothing.
+        if (coords && !params.has("city")) {
+          params.set("lat", coords.lat);
+          params.set("lon", coords.lon);
+          if (effectiveLoc) setLocationLabel(effectiveLoc);
         }
       }
 
@@ -265,6 +297,7 @@ function SearchResultsInner() {
           const data = await res.json();
           const detectedCity = data.address?.city ?? data.address?.town ?? data.address?.village ?? data.address?.county ?? "";
           if (detectedCity) {
+            storeLocation({ lat: latitude, lon: longitude, label: detectedCity });
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.set("loc", detectedCity);
             currentUrl.searchParams.set("lat", latitude.toString());
@@ -334,6 +367,12 @@ function SearchResultsInner() {
               <p className="text-sm font-semibold text-foreground">
                 {resultCount} hospital{resultCount !== 1 ? "s" : ""} match your search
               </p>
+              {locationLabel && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full border border-primary/20">
+                  <MapPin className="w-3 h-3" />
+                  Near {locationLabel.split(",")[0]}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-3">

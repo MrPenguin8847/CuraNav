@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, MapPin, Building2, Shield, Loader2, Filter, IndianRupee, Stethoscope, Pill, Activity, Info, Database, HeartPulse } from "lucide-react";
 import { getEstimatedCost } from "@/lib/costEstimator";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
+import { getStoredLocation, storeLocation, clearStoredLocation } from "@/lib/userLocation";
 
 interface HeroSearchProps {
   query: string;
@@ -33,6 +34,17 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
   });
 
   const suggestedCost = specialty ? getEstimatedCost(specialty) : null;
+
+  // Restore the user's previously saved location so it is sent with every search.
+  useEffect(() => {
+    const saved = getStoredLocation();
+    if (saved) {
+      setLocationLabel(saved.label);
+      setLocationCoords({ lat: saved.lat, lon: saved.lon });
+      const savedCity = saved.label.split(",")[0].trim();
+      if (savedCity) setCity(savedCity);
+    }
+  }, []);
 
   useEffect(() => {
     const q = condition.toLowerCase();
@@ -120,6 +132,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
             setLocationLabel(label);
             setLocationCoords({ lat: latitude, lon: longitude });
             setCity(detectedCity); // auto-fill filter city
+            storeLocation({ lat: latitude, lon: longitude, label }); // persist for future searches
             setLocError(null);
           } else {
             setLocError("Could not determine your city");
@@ -239,6 +252,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                     onClick={() => {
                       setLocationLabel(null);
                       setLocationCoords(null);
+                      clearStoredLocation();
                     }}
                     className="ml-1 text-success/60 hover:text-success transition-colors text-sm leading-none"
                     aria-label="Remove location"
