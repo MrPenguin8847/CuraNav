@@ -8,24 +8,72 @@ import {
   CheckCircle2,
   PlusCircle,
   MinusCircle,
+  Stethoscope,
+  Navigation,
+  Wallet,
+  Award,
+  TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import { Hospital } from "@/lib/mockHospitals";
 import { FACILITY_ICONS } from "@/lib/facilityIcons";
 import { VerificationBadge } from "./VerificationBadge";
 import { getEstimatedCost } from "@/lib/costEstimator";
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Types
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export interface ActiveFilters {
+  condition: string | null;
+  specialty: string | null;
+  city: string | null;
+  radius_km: number | null;
+  min_budget: number | null;
+  max_budget: number | null;
+  facilities: string | null;
+  sort_by: string;
+}
+
+interface ExplainChip {
+  icon: React.ReactNode;
+  label: string;
+  detail: string;
+  color: "green" | "blue" | "amber" | "purple" | "slate";
+}
+
 interface HospitalCardProps {
   hospital: Hospital;
   isSelected: boolean;
   onToggleCompare: (id: string) => void;
   compareCount: number;
+  activeFilters?: ActiveFilters;
+  rankIndex?: number;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Colour map for chips
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const CHIP_COLORS: Record<ExplainChip["color"], string> = {
+  green:  "bg-emerald-50 text-emerald-700 border-emerald-200",
+  blue:   "bg-sky-50 text-sky-700 border-sky-200",
+  amber:  "bg-amber-50 text-amber-700 border-amber-200",
+  purple: "bg-violet-50 text-violet-700 border-violet-200",
+  slate:  "bg-slate-50 text-slate-600 border-slate-200",
+};
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Component
+ * ──────────────────────────────────────────────────────────────────────── */
 
 export function HospitalCard({
   hospital,
   isSelected,
   onToggleCompare,
   compareCount,
+  activeFilters,
+  rankIndex,
 }: HospitalCardProps) {
   const {
     hospitalId,
@@ -52,14 +100,6 @@ export function HospitalCard({
 
   const matchingSpecialty = specialties[0] ?? "General";
 
-  const whyReasons = [
-    `Matches ${matchingSpecialty}`,
-    distance_km != null ? `${distance_km.toFixed(1)} km away` : null,
-    facilities.includes("Dialysis") ? "Has Dialysis" : null,
-    pmjayEmpanelled ? "PM-JAY empanelled" : null,
-    accreditation.length > 0 ? `${accreditation[0]} accredited` : null,
-  ].filter(Boolean) as string[];
-
   const handleCompareClick = () => {
     if (!isSelected && compareCount >= 5) return;
     onToggleCompare(hospitalId);
@@ -68,16 +108,191 @@ export function HospitalCard({
   const specialtyCost = getEstimatedCost(matchingSpecialty);
   const estimatedAvgCost = specialtyCost ? Math.round((specialtyCost.min + specialtyCost.max) / 2) : null;
 
+  /* ──────────────────────────────────────────────────────────────────────────
+   * DYNAMIC EXPLAINABILITY ENGINE
+   *
+   * Compares the hospital's data against the user's extracted search filters
+   * to produce contextual, data-driven explanation chips.
+   * ──────────────────────────────────────────────────────────────────────── */
+
+  const explainChips: ExplainChip[] = [];
+
+  if (activeFilters) {
+    // 1) Disease / Specialty match
+    const searchedCondition = activeFilters.condition || activeFilters.specialty;
+    if (searchedCondition) {
+      const condLower = searchedCondition.toLowerCase();
+      const matched = specialties.find((s) => s.toLowerCase().includes(condLower));
+      if (matched) {
+        explainChips.push({
+          icon: <Stethoscope className="w-3.5 h-3.5" />,
+          label: "Specialty Match",
+          detail: `Has ${matched}`,
+          color: "green",
+        });
+      } else {
+        // Partial / broad match
+        explainChips.push({
+          icon: <Stethoscope className="w-3.5 h-3.5" />,
+          label: "Related",
+          detail: `Offers ${matchingSpecialty}`,
+          color: "slate",
+        });
+      }
+    }
+
+    // 2) Location match
+    if (activeFilters.city) {
+      const cityLower = activeFilters.city.toLowerCase();
+      const hospitalCity = (city ?? hospital.address ?? "").toLowerCase();
+      if (hospitalCity.includes(cityLower)) {
+        explainChips.push({
+          icon: <MapPin className="w-3.5 h-3.5" />,
+          label: "Location Match",
+          detail: distance_km != null ? `${distance_km.toFixed(1)} km away in ${city}` : `In ${city}`,
+          color: "blue",
+        });
+      } else if (distance_km != null) {
+        explainChips.push({
+          icon: <Navigation className="w-3.5 h-3.5" />,
+          label: "Nearby",
+          detail: `${distance_km.toFixed(1)} km from ${activeFilters.city}`,
+          color: "blue",
+        });
+      }
+    } else if (distance_km != null) {
+      explainChips.push({
+        icon: <Navigation className="w-3.5 h-3.5" />,
+        label: "Distance",
+        detail: `${distance_km.toFixed(1)} km away`,
+        color: "blue",
+      });
+    }
+
+    // 3) Budget match
+    if (activeFilters.max_budget != null) {
+      const budget = activeFilters.max_budget;
+      if (costMin != null && costMin <= budget) {
+        explainChips.push({
+          icon: <Wallet className="w-3.5 h-3.5" />,
+          label: "Within Budget",
+          detail: `Starts at ${formatCost(costMin)} (budget: ${formatCost(budget)})`,
+          color: "green",
+        });
+      } else if (costMin != null && costMin > budget) {
+        explainChips.push({
+          icon: <Wallet className="w-3.5 h-3.5" />,
+          label: "Over Budget",
+          detail: `Starts at ${formatCost(costMin)} (budget: ${formatCost(budget)})`,
+          color: "amber",
+        });
+      } else if (pmjayEmpanelled) {
+        explainChips.push({
+          icon: <Wallet className="w-3.5 h-3.5" />,
+          label: "Within Budget",
+          detail: "PM-JAY – Free / Subsidized",
+          color: "green",
+        });
+      }
+    }
+
+    // 4) Priority match (distance vs cost) — show for ALL results, not just #1
+    if (activeFilters.sort_by === "cost") {
+      if (rankIndex === 0) {
+        explainChips.push({
+          icon: <TrendingUp className="w-3.5 h-3.5" />,
+          label: "Most Affordable",
+          detail: costMin != null ? `From ${formatCost(costMin)}` : "Lowest cost option",
+          color: "green",
+        });
+      } else {
+        explainChips.push({
+          icon: <Wallet className="w-3.5 h-3.5" />,
+          label: "Sorted by Cost",
+          detail: costMin != null ? `From ${formatCost(costMin)}` : pmjayEmpanelled ? "PM-JAY – Free / Subsidized" : "Contact for pricing",
+          color: "blue",
+        });
+      }
+    } else if (activeFilters.sort_by === "distance") {
+      if (rankIndex === 0 && distance_km != null) {
+        explainChips.push({
+          icon: <TrendingUp className="w-3.5 h-3.5" />,
+          label: "Closest",
+          detail: `${distance_km.toFixed(1)} km away`,
+          color: "green",
+        });
+      } else if (distance_km != null) {
+        explainChips.push({
+          icon: <Navigation className="w-3.5 h-3.5" />,
+          label: "Sorted by Distance",
+          detail: `${distance_km.toFixed(1)} km away`,
+          color: "blue",
+        });
+      }
+    }
+
+    // 5) Accreditation & trust signals
+    if (accreditation.length > 0) {
+      explainChips.push({
+        icon: <Award className="w-3.5 h-3.5" />,
+        label: "Accredited",
+        detail: accreditation.join(", "),
+        color: "purple",
+      });
+    }
+
+    // 6) PM-JAY — show when no explicit budget but hospital is empanelled
+    if (pmjayEmpanelled && activeFilters.max_budget == null) {
+      explainChips.push({
+        icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+        label: "PM-JAY",
+        detail: "Free / Subsidized for beneficiaries",
+        color: "green",
+      });
+    }
+  } else {
+    // Fallback: no active filters — show basic static reasons
+    const fallbackReasons = [
+      `Matches ${matchingSpecialty}`,
+      distance_km != null ? `${distance_km.toFixed(1)} km away` : null,
+      pmjayEmpanelled ? "PM-JAY empanelled" : null,
+      accreditation.length > 0 ? `${accreditation[0]} accredited` : null,
+    ].filter(Boolean) as string[];
+
+    fallbackReasons.slice(0, 3).forEach((r) => {
+      explainChips.push({
+        icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+        label: "",
+        detail: r,
+        color: "slate",
+      });
+    });
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * Render
+   * ──────────────────────────────────────────────────────────────────────── */
+
+  const isTopResult = rankIndex === 0 && activeFilters;
+
   return (
     <article
-      className={`card p-5 md:p-6 transition-all duration-200 ${
+      className={`card p-5 md:p-6 transition-all duration-200 relative ${
         isSelected
           ? "border-primary shadow-md shadow-primary/10 ring-1 ring-primary/30"
           : "hover:shadow-md"
-      }`}
+      } ${isTopResult ? "ring-2 ring-primary/20 border-primary/30" : ""}`}
     >
+      {/* Top Result badge */}
+      {isTopResult && (
+        <div className="absolute -top-3 left-4 inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-primary to-indigo-600 text-white text-xs font-bold rounded-full shadow-lg">
+          <Sparkles className="w-3 h-3" />
+          Best Match
+        </div>
+      )}
+
       {/* Top row: Name + Verification badge */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+      <div className={`flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4 ${isTopResult ? "mt-2" : ""}`}>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="inline-block px-2 py-0.5 bg-primary/10 text-primary text-xs font-semibold rounded-full">
@@ -120,53 +335,85 @@ export function HospitalCard({
       </div>
 
       {/* Cost estimate */}
-      <div className="flex items-center gap-3 mb-4 p-3 bg-gradient-to-r from-slate-50 to-indigo-50/30 rounded-xl border border-slate-100">
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-          <IndianRupee className="w-5 h-5 text-primary" />
-        </div>
-        <div className="flex-1">
-          {costMin != null && costMax != null ? (
-            <>
-              <p className="text-xs text-muted font-medium mb-0.5">Estimated Cost Range</p>
-              <p className="text-xl font-extrabold text-foreground tracking-tight">
-                {formatCost(costMin)} – {formatCost(costMax)}
-              </p>
-              <p className="text-xs text-primary font-semibold">
-                Avg: {formatCost(Math.round((costMin + costMax) / 2))}
-              </p>
-            </>
-          ) : pmjayEmpanelled ? (
-            <div className="flex flex-col gap-2">
-              <div>
-                <p className="text-xs text-muted font-medium mb-0.5">PM-JAY Beneficiary</p>
-                <p className="text-base font-bold text-success leading-tight">Free / Subsidized Rates</p>
+      <div className="mb-4 p-3 bg-gradient-to-r from-slate-50 to-indigo-50/30 rounded-xl border border-slate-100">
+        {pmjayEmpanelled && (costMin != null || estimatedAvgCost) ? (
+          /* ── DUAL COST: PM-JAY + Regular ── */
+          <div className="grid grid-cols-2 gap-3">
+            {/* PM-JAY column */}
+            <div className="flex items-start gap-2.5 p-2.5 bg-success/5 rounded-lg border border-success/10">
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-success/10 flex items-center justify-center mt-0.5">
+                <CheckCircle2 className="w-4.5 h-4.5 text-success" />
               </div>
-              {estimatedAvgCost && (
-                <div className="border-t border-slate-200/70 pt-1.5 mt-0.5">
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">Non PM-JAY Estimated Avg</p>
-                  <p className="text-sm font-semibold text-slate-700">
-                    {formatCost(estimatedAvgCost)} <span className="text-xs font-normal text-slate-500">for {matchingSpecialty}</span>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider font-bold text-success/70 mb-0.5">PM-JAY Beneficiary</p>
+                <p className="text-lg font-extrabold text-success">Free</p>
+                <p className="text-[10px] text-success/60 font-medium">Subsidized Rates</p>
+              </div>
+            </div>
+            {/* Non-PM-JAY column */}
+            <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
+                <IndianRupee className="w-4.5 h-4.5 text-primary" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">Without PM-JAY</p>
+                {costMin != null && costMax != null ? (
+                  <>
+                    <p className="text-lg font-extrabold text-foreground">{formatCost(costMin)} – {formatCost(costMax)}</p>
+                    <p className="text-[10px] text-primary font-semibold">Avg: {formatCost(Math.round((costMin + costMax) / 2))}</p>
+                  </>
+                ) : estimatedAvgCost ? (
+                  <>
+                    <p className="text-lg font-extrabold text-foreground">~{formatCost(estimatedAvgCost)}</p>
+                    <p className="text-[10px] text-slate-500 font-medium">Est. for {matchingSpecialty}</p>
+                  </>
+                ) : (
+                  <p className="text-sm font-semibold text-slate-500">Contact for pricing</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ── SINGLE COST ROW ── */
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <IndianRupee className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              {costMin != null && costMax != null ? (
+                <>
+                  <p className="text-xs text-muted font-medium mb-0.5">Estimated Cost Range</p>
+                  <p className="text-xl font-extrabold text-foreground tracking-tight">
+                    {formatCost(costMin)} – {formatCost(costMax)}
                   </p>
+                  <p className="text-xs text-primary font-semibold">
+                    Avg: {formatCost(Math.round((costMin + costMax) / 2))}
+                  </p>
+                </>
+              ) : pmjayEmpanelled ? (
+                <div>
+                  <p className="text-xs text-muted font-medium mb-0.5">PM-JAY Beneficiary</p>
+                  <p className="text-base font-bold text-success leading-tight">Free / Subsidized Rates</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div>
+                    <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
+                    <p className="text-base font-semibold text-slate-500">Contact for pricing</p>
+                  </div>
+                  {estimatedAvgCost && (
+                    <div className="border-t border-slate-200/70 pt-1.5 mt-0.5">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">Estimated Avg Cost</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {formatCost(estimatedAvgCost)} <span className="text-xs font-normal text-slate-500">for {matchingSpecialty}</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div>
-                <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
-                <p className="text-base font-semibold text-slate-500">Contact for pricing</p>
-              </div>
-              {estimatedAvgCost && (
-                <div className="border-t border-slate-200/70 pt-1.5 mt-0.5">
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">Estimated Avg Cost</p>
-                  <p className="text-sm font-semibold text-slate-700">
-                    {formatCost(estimatedAvgCost)} <span className="text-xs font-normal text-slate-500">for {matchingSpecialty}</span>
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Facilities */}
@@ -198,18 +445,25 @@ export function HospitalCard({
         <span className="capitalize font-medium">{sourceType}</span>
       </p>
 
-      {/* Why this result */}
+      {/* ── DYNAMIC EXPLAINABILITY SECTION ── */}
       <div className="border-t border-border pt-3 mb-4">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
           Why this result
         </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {whyReasons.slice(0, 3).map((reason) => (
-            <span key={reason} className="flex items-center gap-1 text-xs text-muted">
-              <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
-              {reason}
+        <div className="flex flex-wrap gap-2">
+          {explainChips.map((chip, i) => (
+            <span
+              key={i}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${CHIP_COLORS[chip.color]}`}
+            >
+              {chip.icon}
+              {chip.label && <span className="font-bold">{chip.label}:</span>}
+              <span className="font-medium">{chip.detail}</span>
             </span>
           ))}
+          {explainChips.length === 0 && (
+            <span className="text-xs text-muted italic">General result</span>
+          )}
         </div>
       </div>
 

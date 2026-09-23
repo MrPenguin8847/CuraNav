@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ListFilter, SlidersHorizontal } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ListFilter, SlidersHorizontal, MapPin, Loader2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ExplainabilityPanel } from "@/components/ExplainabilityPanel";
@@ -47,6 +48,12 @@ function SearchResultsInner() {
   const [compareWarning, setCompareWarning] = useState(false);
   const [showManualFilters, setShowManualFilters] = useState(false);
 
+  // ── Location prompt state ─────────────────────────────────────────────────
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [pendingNlData, setPendingNlData] = useState<any>(null);
+  const router = useRouter();
+
   // ── Fetch from /api/hospitals ─────────────────────────────────────────────
   const fetchHospitals = useCallback(async () => {
     setIsLoading(true);
@@ -74,6 +81,17 @@ function SearchResultsInner() {
         if (nlRes.ok) {
           const nlData = await nlRes.json();
           setExplanation(nlData.explanation);
+
+          // Detect location-intent queries that need geolocation
+          const queryLower = rawQuery.toLowerCase();
+          const needsLocation = (queryLower.includes("near me") || queryLower.includes("nearby") || queryLower.includes("closest") || queryLower.includes("nearest")) && !searchParams.get("loc") && !nlData.filters.city;
+
+          if (needsLocation) {
+            setPendingNlData(nlData);
+            setShowLocationPrompt(true);
+            setIsLoading(false);
+            return; // Stop here — wait for user to provide location
+          }
           
           if (nlData.filters.condition) params.set("condition", nlData.filters.condition);
           if (nlData.filters.specialty) params.set("specialty", nlData.filters.specialty);
@@ -205,6 +223,68 @@ function SearchResultsInner() {
   const resultCount = sortedHospitals.length;
   const showEmpty = !isLoading && !error && resultCount === 0;
 
+  const activeFilters = useMemo(() => {
+    return {
+      condition: searchParams.get("condition"),
+      specialty: searchParams.get("specialty"),
+      city: searchParams.get("city"),
+      radius_km: searchParams.get("radius_km") ? Number(searchParams.get("radius_km")) : null,
+      min_budget: searchParams.get("min_budget") ? Number(searchParams.get("min_budget")) : null,
+      max_budget: searchParams.get("max_budget") ? Number(searchParams.get("max_budget")) : null,
+      facilities: searchParams.get("facilities"),
+      sort_by: sort, // Use React state, not URL param
+    };
+  }, [searchParams, sort]);
+
+  // ── Location prompt handler ──────────────────────────────────────────────
+  const handleLocationGrant = () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
+            { headers: { "User-Agent": "CuraNav/1.0" } }
+          );
+          const data = await res.json();
+          const detectedCity = data.address?.city ?? data.address?.town ?? data.address?.village ?? data.address?.county ?? "";
+          if (detectedCity) {
+            // Re-run the search with the location context
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set("loc", detectedCity);
+            setShowLocationPrompt(false);
+            setPendingNlData(null);
+            router.replace(currentUrl.pathname + currentUrl.search);
+          }
+        } catch {
+          // Fall through — just continue without location
+          setShowLocationPrompt(false);
+          continueWithoutLocation();
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocating(false);
+        setShowLocationPrompt(false);
+        continueWithoutLocation();
+      },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
+
+  const continueWithoutLocation = useCallback(() => {
+    setShowLocationPrompt(false);
+    if (pendingNlData) {
+      // Re-trigger fetch without location requirement
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set("loc", "skip");
+      router.replace(currentUrl.pathname + currentUrl.search);
+    }
+  }, [pendingNlData, router]);
+
   return (
     <div className={`min-h-screen flex flex-col bg-background font-sans ${selectedIds.length > 0 ? "pb-20" : ""}`}>
       <Header />
@@ -287,16 +367,54 @@ function SearchResultsInner() {
           <EmptyState />
         ) : (
           <section className="space-y-4" aria-label="Hospital results">
-            {sortedHospitals.map((hospital) => (
+            {sortedHospitals.map((hospital, index) => (
               <HospitalCard
                 key={hospital.hospitalId}
                 hospital={hospital}
                 isSelected={selectedIds.includes(hospital.hospitalId)}
                 onToggleCompare={handleToggleCompare}
                 compareCount={selectedIds.length}
+                activeFilters={activeFilters}
+                rankIndex={index}
               />
             ))}
           </section>
+        )}
+
+        {/* ── LOCATION PROMPT MODAL ── */}
+        {showLocationPrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center space-y-6 animate-fade-in">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <MapPin className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground mb-2">Enable Location</h2>
+                <p className="text-muted text-sm">
+                  Your search includes <span className="font-semibold text-foreground">"near me"</span>. To show hospitals closest to you, we need your location.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={handleLocationGrant}
+                  disabled={locating}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-60"
+                >
+                  {locating ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" /> Detecting location...</>
+                  ) : (
+                    <><MapPin className="w-5 h-5" /> Allow Location Access</>
+                  )}
+                </button>
+                <button
+                  onClick={continueWithoutLocation}
+                  className="w-full px-6 py-3 text-muted font-medium rounded-xl border border-border hover:bg-slate-50 transition-colors text-sm"
+                >
+                  Skip — show all results instead
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
 

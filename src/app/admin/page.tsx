@@ -62,7 +62,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateVerification = async (id: string, newStatus: "verified" | "pending" | "simulated" | "unverified") => {
+  const handleUpdateVerification = async (id: string, newStatus: "verified" | "pending" | "simulated") => {
     // Optimistic UI update
     setHospitals((prev) =>
       prev.map((h) => (h.hospitalId === id ? { ...h, verificationStatus: newStatus } : h))

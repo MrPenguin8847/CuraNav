@@ -73,13 +73,19 @@ export async function GET(req: NextRequest) {
     {};
 
   if (city) {
-    // If radius is provided, we don't strictly filter by city name string match in DB,
-    // because we will filter by coordinates later. But we still record it.
-    if (!radiusKm) {
-      const cities = city.split(',').map(c => c.trim()).filter(Boolean);
-      const conditions = cities.flatMap(c => [`city.ilike.%${c}%`, `state.ilike.%${c}%`, `address.ilike.%${c}%`]);
-      if (conditions.length > 0) {
-        query = query.or(conditions.join(','));
+    // If the destination is "India", return all hospitals by skipping the city filter
+    const lowerCity = city.trim().toLowerCase();
+    const isWholeCountry = lowerCity === "india" || lowerCity === "bharat";
+
+    if (!isWholeCountry) {
+      // If radius is provided, we don't strictly filter by city name string match in DB,
+      // because we will filter by coordinates later. But we still record it.
+      if (!radiusKm) {
+        const cities = city.split(',').map(c => c.trim()).filter(Boolean);
+        const conditions = cities.flatMap(c => [`city.ilike.%${c}%`, `state.ilike.%${c}%`, `address.ilike.%${c}%`]);
+        if (conditions.length > 0) {
+          query = query.or(conditions.join(','));
+        }
       }
     }
     filtersApplied.city = city;

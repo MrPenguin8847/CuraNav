@@ -76,7 +76,7 @@ export async function PATCH(
     }
 
     if (verificationStatus) {
-      if (!['pending', 'verified', 'simulated', 'unverified'].includes(verificationStatus)) {
+      if (!['pending', 'verified', 'simulated'].includes(verificationStatus)) {
         return NextResponse.json({ error: "Invalid verificationStatus" }, { status: 400 });
       }
       updateData.verification_status = verificationStatus;
