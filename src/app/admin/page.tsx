@@ -8,13 +8,16 @@ import { Hospital, ReviewStatus } from "@/lib/mockHospitals";
 import { Check, X, Clock, Database, AlertCircle, FileText, LogOut, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import { AddHospitalModal } from "./AddHospitalModal";
+import { CsvUploadModal } from "./CsvUploadModal";
 
 export default function AdminDashboard() {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ReviewStatus | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const router = useRouter();
 
   const fetchHospitals = async () => {
@@ -80,9 +83,15 @@ export default function AdminDashboard() {
     }
   };
 
-  const filteredHospitals = hospitals.filter(
-    (h) => filter === "all" || h.reviewStatus === filter
-  );
+  const filteredHospitals = hospitals.filter((h) => {
+    const matchesTab = filter === "all" || h.reviewStatus === filter;
+    const matchesSearch =
+      !searchQuery ||
+      h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (h.city && h.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (h.hospitalId && h.hospitalId.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesTab && matchesSearch;
+  });
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -105,7 +114,14 @@ export default function AdminDashboard() {
               Review and curate hospital records before they appear in public search results.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setIsCsvModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-medium transition-colors text-sm shadow-sm"
+            >
+              <FileText className="w-4 h-4" />
+              Upload CSV
+            </button>
             <button
               onClick={() => setIsModalOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded-xl font-medium transition-colors text-sm shadow-sm"
@@ -123,26 +139,40 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {(["all", "pending", "approved", "rejected"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setFilter(tab)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${
-                filter === tab
-                  ? "bg-primary text-white"
-                  : "bg-white text-slate-600 border border-slate-200 hover:border-primary/50"
-              }`}
-            >
-              {tab}
-              {tab !== "all" && (
-                <span className="ml-2 text-xs opacity-75">
-                  ({hospitals.filter((h) => h.reviewStatus === tab).length})
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Filters and Search */}
+        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+          <div className="flex flex-wrap gap-2">
+            {(["all", "pending", "approved", "rejected"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${
+                  filter === tab
+                    ? "bg-primary text-white"
+                    : "bg-white text-slate-600 border border-slate-200 hover:border-primary/50"
+                }`}
+              >
+                {tab}
+                {tab !== "all" && (
+                  <span className="ml-2 text-xs opacity-75">
+                    ({hospitals.filter((h) => h.reviewStatus === tab).length})
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full sm:w-64 flex-shrink-0">
+            <input
+              type="text"
+              placeholder="Search hospitals..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -243,6 +273,15 @@ export default function AdminDashboard() {
         onClose={() => setIsModalOpen(false)} 
         onSuccess={() => {
           setIsModalOpen(false);
+          fetchHospitals();
+        }}
+      />
+      
+      <CsvUploadModal 
+        isOpen={isCsvModalOpen} 
+        onClose={() => setIsCsvModalOpen(false)} 
+        onSuccess={() => {
+          setIsCsvModalOpen(false);
           fetchHospitals();
         }}
       />

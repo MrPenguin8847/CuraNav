@@ -66,6 +66,7 @@ function validateResponseSchema(data: any): any {
   const city = f.city ?? null;
   const max_budget = typeof f.max_budget === "number" ? f.max_budget : null;
   const facilities = f.facilities ?? null;
+  const fallback_cities = Array.isArray(f.fallback_cities) ? f.fallback_cities : null;
 
   // Validate chips
   const chips: Array<{ icon: string; label: string; value: string }> = [];
@@ -78,7 +79,7 @@ function validateResponseSchema(data: any): any {
   }
 
   return {
-    filters: { condition, specialty, city, max_budget, facilities },
+    filters: { condition, specialty, city, fallback_cities, max_budget, facilities },
     chips
   };
 }
@@ -98,6 +99,7 @@ Extract:
 - condition: the medical condition (e.g. "kidney disease", "heart disease", "cancer"). Null if none.
 - specialty: the corresponding medical specialty (e.g. "Nephrology", "Cardiology", "Oncology"). Null if none.
 - city: the city mentioned. Null if none.
+- fallback_cities: an array of 2-3 nearby major cities or districts geographically close to 'city'. Important if 'city' is a small town/village. Empty array if none.
 - max_budget: the maximum budget in Indian Rupees (INR) as an integer. Parse "under 2 lakh" as 200000, "under 50k" as 50000. Null if none.
 - facilities: comma separated list of facilities (e.g. "Dialysis,ICU"). Null if none.
 - chips: an array of UI chips summarizing what was extracted. Each chip has { "icon", "label", "value" }. Use emojis: 🩺 Condition, ⚕️ Specialty, 📍 Location, 💰 Budget, 🏥 Facilities. Always end with { "icon": "🎯", "label": "Priority", "value": "Best match" }.
@@ -108,6 +110,7 @@ EXPECTED JSON SCHEMA:
     "condition": string | null,
     "specialty": string | null,
     "city": string | null,
+    "fallback_cities": string[],
     "max_budget": number | null,
     "facilities": string | null
   },
@@ -183,6 +186,68 @@ async function callOpenRouter(apiKey: string, query: string) {
   }
 }
 
+// ── Groq API call ───────────────────────────────────────────────────────
+async function callGroq(apiKey: string, query: string) {
+  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "llama3-8b-8192",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: query }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0,
+        }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        const isTransient = [408, 429, 500, 502, 503, 504].includes(res.status);
+        
+        if (isTransient && attempt < RETRY_DELAYS.length) {
+          console.warn(`[Groq] Attempt ${attempt + 1} - Transient error ${res.status}. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
+          await sleep(RETRY_DELAYS[attempt]);
+          continue;
+        }
+        throw new Error(`Groq HTTP ${res.status}: ${errBody}`);
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error("Empty response from Groq");
+
+      const parsed = parseModelJson(content);
+      return validateResponseSchema(parsed);
+
+    } catch (err: unknown) {
+      if (err instanceof JsonParseError || err instanceof ValidationError) {
+        throw err;
+      }
+      
+      const errMsg = err instanceof Error ? err.message : String(err);
+      
+      if (attempt < RETRY_DELAYS.length && (errMsg.includes("fetch") || errMsg.includes("network"))) {
+        console.warn(`[Groq] Attempt ${attempt + 1} - Network error. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
+        await sleep(RETRY_DELAYS[attempt]);
+        continue;
+      }
+      
+      if (attempt >= RETRY_DELAYS.length) {
+        throw new Error(`Groq failed after ${attempt} retries: ${errMsg}`);
+      }
+      
+      throw err;
+    }
+  }
+}
+
 // ── Gemini SDK call ───────────────────────────────────────────────────────────
 async function callGemini(ai: GoogleGenAI, query: string) {
   const schema = {
@@ -194,6 +259,7 @@ async function callGemini(ai: GoogleGenAI, query: string) {
           condition: { type: Type.STRING, nullable: true },
           specialty: { type: Type.STRING, nullable: true },
           city: { type: Type.STRING, nullable: true },
+          fallback_cities: { type: Type.ARRAY, items: { type: Type.STRING } },
           max_budget: { type: Type.INTEGER, nullable: true },
           facilities: { type: Type.STRING, nullable: true }
         }
@@ -279,43 +345,70 @@ function localExtract(query: string) {
   if (facilities.length > 0) chips.push({ icon: "🏥", label: "Facilities", value: facilities.join(", ") });
   chips.push({ icon: "🎯", label: "Priority", value: "Best match" });
 
-  return { filters: { condition, specialty, city, max_budget, facilities: facilities.length > 0 ? facilities.join(",") : null }, chips };
+  return { filters: { condition, specialty, city, fallback_cities: [], max_budget, facilities: facilities.length > 0 ? facilities.join(",") : null }, chips };
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
   try {
-    const { query } = await req.json();
+    const { query, locationContext } = await req.json();
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    // Provider 1: OpenRouter
-    if (process.env.OPENROUTER_API_KEY) {
+    let fullQuery = query;
+    if (locationContext) {
+      fullQuery += ` (User's detected location context: ${locationContext}. Use this to resolve "near me" or "nearby" queries to this specific city).`;
+    }
+
+    // Collect all configured providers
+    const providers: { name: string; type: "openrouter" | "gemini" | "groq"; key: string }[] = [];
+    
+    // Dynamically find all OPENROUTER_API_KEY and GROQ_API_KEY variables
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith("OPENROUTER_API_KEY") && value) {
+        providers.push({ name: key, type: "openrouter", key: value });
+      } else if (key.startsWith("GROQ_API_KEY") && value) {
+        providers.push({ name: key, type: "groq", key: value });
+      }
+    }
+    
+    // Add Gemini if available
+    if (process.env.GEMINI_API_KEY) {
+      providers.push({ name: "GEMINI_API_KEY", type: "gemini", key: process.env.GEMINI_API_KEY });
+    }
+
+    let result = null;
+
+    for (const provider of providers) {
       try {
-        const result = await callOpenRouter(process.env.OPENROUTER_API_KEY, query);
-        return NextResponse.json({ filters: result.filters, explanation: { query, chips: result.chips } });
-      } catch (orError) {
-        console.warn(`[Fallback] OpenRouter failed: ${orError instanceof Error ? orError.message : "Unknown error"}. Proceeding to next provider.`);
+        if (provider.type === "openrouter") {
+          result = await callOpenRouter(provider.key, fullQuery);
+        } else if (provider.type === "groq") {
+          result = await callGroq(provider.key, fullQuery);
+        } else if (provider.type === "gemini") {
+          const ai = new GoogleGenAI({ apiKey: provider.key });
+          result = await callGemini(ai, fullQuery);
+        }
+        
+        if (result) break; // Success! Exit the waterfall loop.
+      } catch (error) {
+        console.warn(`[Fallback] ${provider.name} failed: ${error instanceof Error ? error.message : String(error)}. Proceeding to next provider...`);
       }
     }
 
-    // Provider 2: Gemini SDK
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const result = await callGemini(ai, query);
-        return NextResponse.json({ filters: result.filters, explanation: { query, chips: result.chips } });
-      } catch (geminiError) {
-        console.warn(`[Fallback] Gemini SDK failed: ${geminiError instanceof Error ? geminiError.message : "Unknown error"}. Proceeding to fallback.`);
-      }
+    if (result) {
+      return NextResponse.json({ filters: result.filters, explanation: { query, chips: result.chips } });
     }
 
     // Provider 3: Local fallback
-    if (!process.env.OPENROUTER_API_KEY && !process.env.GEMINI_API_KEY) {
+    if (providers.length === 0) {
       console.warn("[Fallback] No AI API keys configured. Using local extraction.");
+    } else {
+      console.warn("[Fallback] All AI providers failed. Using local extraction.");
     }
-    const localResult = localExtract(query);
+    
+    const localResult = localExtract(fullQuery);
     return NextResponse.json({ filters: localResult.filters, explanation: { query, chips: localResult.chips, fallback: true } });
 
   } catch (error) {

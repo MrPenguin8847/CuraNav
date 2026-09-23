@@ -109,15 +109,34 @@ export function HospitalCard({
       </div>
 
       {/* Cost estimate */}
-      <div className="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
-        <IndianRupee className="w-4 h-4 text-primary flex-shrink-0" />
-        <div>
-          <p className="text-xl font-extrabold text-foreground tracking-tight">
-            {costMin != null && costMax != null
-              ? `${formatCost(costMin)} – ${formatCost(costMax)}`
-              : pmjayEmpanelled ? "Standard PM-JAY Rates" : "Contact for pricing"}
-          </p>
-          <p className="text-xs text-muted">{costMin != null ? "Indicative cost range" : pmjayEmpanelled ? "Rates strictly follow Govt PM-JAY packages" : "Pricing not available"}</p>
+      <div className="flex items-center gap-3 mb-4 p-3 bg-gradient-to-r from-slate-50 to-indigo-50/30 rounded-xl border border-slate-100">
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <IndianRupee className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1">
+          {costMin != null && costMax != null ? (
+            <>
+              <p className="text-xs text-muted font-medium mb-0.5">Estimated Cost Range</p>
+              <p className="text-xl font-extrabold text-foreground tracking-tight">
+                {formatCost(costMin)} – {formatCost(costMax)}
+              </p>
+              <p className="text-xs text-primary font-semibold">
+                Avg: {formatCost(Math.round((costMin + costMax) / 2))}
+              </p>
+            </>
+          ) : pmjayEmpanelled ? (
+            <>
+              <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
+              <p className="text-lg font-bold text-success">Standard PM-JAY Rates</p>
+              <p className="text-xs text-muted">Rates strictly follow Govt PM-JAY packages</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
+              <p className="text-base font-semibold text-slate-500">Contact for pricing</p>
+              <p className="text-xs text-muted">Pricing not available yet</p>
+            </>
+          )}
         </div>
       </div>
 

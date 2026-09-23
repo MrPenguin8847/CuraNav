@@ -22,21 +22,23 @@ import { VerificationBadge } from "@/components/VerificationBadge";
 import { FACILITY_ICONS } from "@/lib/facilityIcons";
 import { Hospital } from "@/lib/mockHospitals";
 
+import { supabaseAdmin } from "@/lib/supabase";
+import { mapHospital } from "@/lib/mapHospital";
+
 // ─── Fetch from real API ──────────────────────────────────────────────────────
 // This is a server component — fetching happens at request time on the server.
 async function getHospital(id: string): Promise<Hospital | null> {
   try {
-    // Use absolute URL for server-side fetch in Next.js
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      ? `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}`
-      : "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/hospitals/${id}`, {
-      cache: "no-store", // always fresh — hospital data can change
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    const data: { hospital: Hospital } = await res.json();
-    return data.hospital;
+    const { data, error } = await supabaseAdmin
+      .from("hospitals")
+      .select("*")
+      .eq("hospital_id", id)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+    return mapHospital(data);
   } catch {
     return null;
   }
@@ -107,10 +109,11 @@ function HospitalNotFound({ id }: { id: string }) {
 export default async function HospitalDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const hospital = await getHospital(params.id);
-  if (!hospital) return <HospitalNotFound id={params.id} />;
+  const { id } = await params;
+  const hospital = await getHospital(id);
+  if (!hospital) return <HospitalNotFound id={id} />;
 
   const {
     hospitalId,

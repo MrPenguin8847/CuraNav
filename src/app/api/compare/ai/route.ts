@@ -91,59 +91,110 @@ IMPORTANT RULES:
 
     const userPrompt = `Compare these ${hospitals.length} hospitals:\n\n${profiles}`;
 
-    // Try OpenRouter first, fall back to Gemini
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    const geminiKey = process.env.GEMINI_API_KEY;
-
-    let aiResponse: string;
-
-    if (openRouterKey) {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openRouterKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://curanav.vercel.app",
-          "X-Title": "CuraNav",
-        },
-        body: JSON.stringify({
-          model: "qwen/qwen3.8-27b:free",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.3,
-          max_tokens: 2000,
-        }),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`OpenRouter HTTP ${res.status}: ${errBody}`);
+    // Collect all configured providers
+    const providers: { name: string; type: "openrouter" | "gemini" | "groq"; key: string }[] = [];
+    
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith("OPENROUTER_API_KEY") && value) {
+        providers.push({ name: key, type: "openrouter", key: value });
+      } else if (key.startsWith("GROQ_API_KEY") && value) {
+        providers.push({ name: key, type: "groq", key: value });
       }
+    }
+    
+    if (process.env.GEMINI_API_KEY) {
+      providers.push({ name: "GEMINI_API_KEY", type: "gemini", key: process.env.GEMINI_API_KEY });
+    }
 
-      const result = await res.json();
-      aiResponse = result.choices?.[0]?.message?.content ?? "";
-    } else if (geminiKey) {
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey: geminiKey });
+    let aiResponse: string | null = null;
+    let lastError: any = null;
 
-      const result = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.3,
-          maxOutputTokens: 2000,
-        },
-      });
+    for (const provider of providers) {
+      try {
+        if (provider.type === "openrouter") {
+          const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${provider.key}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://curanav.vercel.app",
+              "X-Title": "CuraNav",
+            },
+            body: JSON.stringify({
+              model: "qwen/qwen3.8-27b:free",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              temperature: 0.3,
+              max_tokens: 2000,
+            }),
+          });
 
-      aiResponse = result.text ?? "";
-    } else {
-      return NextResponse.json(
-        { error: "No AI provider configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY." },
-        { status: 500 }
-      );
+          if (!res.ok) {
+            const errBody = await res.text();
+            throw new Error(`OpenRouter HTTP ${res.status}: ${errBody}`);
+          }
+
+          const result = await res.json();
+          aiResponse = result.choices?.[0]?.message?.content ?? "";
+        } else if (provider.type === "groq") {
+          const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${provider.key}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: "llama3-8b-8192",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              temperature: 0.3,
+              max_tokens: 2000,
+            }),
+          });
+
+          if (!res.ok) {
+            const errBody = await res.text();
+            throw new Error(`Groq HTTP ${res.status}: ${errBody}`);
+          }
+
+          const result = await res.json();
+          aiResponse = result.choices?.[0]?.message?.content ?? "";
+        } else if (provider.type === "gemini") {
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: provider.key });
+
+          const result = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+            config: {
+              systemInstruction: systemPrompt,
+              temperature: 0.3,
+              maxOutputTokens: 2000,
+            },
+          });
+
+          aiResponse = result.text ?? "";
+        }
+        
+        if (aiResponse) break; // Success! Exit waterfall loop.
+      } catch (err) {
+        console.warn(`[AI Compare] ${provider.name} failed: ${err instanceof Error ? err.message : String(err)}. Proceeding to next...`);
+        lastError = err;
+      }
+    }
+
+    if (!aiResponse) {
+      if (providers.length === 0) {
+        return NextResponse.json(
+          { error: "No AI provider configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY." },
+          { status: 500 }
+        );
+      }
+      throw lastError || new Error("All AI providers failed.");
     }
 
     // Clean up any thinking tags the model might have included

@@ -25,7 +25,7 @@ import { Hospital } from "@/lib/mockHospitals";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Lightweight markdown → HTML for the AI summary. Handles headings, bold, lists, tables, and paragraphs. */
+/** Lightweight markdown → styled HTML for the AI summary. */
 function renderMarkdown(md: string): string {
   const escaped = md
     .replace(/&/g, "&amp;")
@@ -33,45 +33,59 @@ function renderMarkdown(md: string): string {
     .replace(/>/g, "&gt;");
 
   let html = escaped
-    // Headings
-    .replace(/^#### (.+)$/gm, "<h4>$1</h4>")
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    // Headings — styled with colors and icons
+    .replace(/^#### (.+)$/gm, '<h4 style="font-size:0.85rem;font-weight:700;color:#334155;margin:1rem 0 0.5rem;padding-left:0.5rem;border-left:3px solid #6366f1">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:0.95rem;font-weight:700;color:#1e293b;margin:1.25rem 0 0.5rem;padding:0.5rem 0.75rem;background:linear-gradient(135deg,#eef2ff,#f8fafc);border-radius:0.5rem;border-left:4px solid #6366f1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:1.05rem;font-weight:800;color:#1e293b;margin:1.5rem 0 0.75rem;padding:0.6rem 0.75rem;background:linear-gradient(135deg,#e0e7ff,#eef2ff);border-radius:0.5rem;border-left:4px solid #4f46e5">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="font-size:1.15rem;font-weight:800;color:#1e293b;margin:0 0 0.75rem">$1</h1>')
     // Bold and italic
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#1e293b;font-weight:700">$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em style="color:#475569">$1</em>')
     // Horizontal rules
-    .replace(/^---$/gm, "<hr/>")
-    // Unordered lists
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
+    .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e2e8f0;margin:1rem 0"/>')
+    // Unordered list items
+    .replace(/^- (.+)$/gm, '<li style="padding:0.3rem 0;font-size:0.85rem;color:#334155;line-height:1.6">$1</li>')
+    // Numbered list items  
+    .replace(/^\d+\.\s+(.+)$/gm, '<li style="padding:0.3rem 0;font-size:0.85rem;color:#334155;line-height:1.6;list-style-type:decimal">$1</li>')
     // Table rows
     .replace(/^\|(.+)\|$/gm, (_, row: string) => {
       const cells = row.split("|").map((c: string) => c.trim());
-      return "<tr>" + cells.map((c: string) => `<td>${c}</td>`).join("") + "</tr>";
+      return "<tr>" + cells.map((c: string) => `<td style="padding:0.5rem 0.75rem;border-bottom:1px solid #e2e8f0;font-size:0.8rem;color:#334155">${c}</td>`).join("") + "</tr>";
     })
     // Separator rows (|---|---|)
-    .replace(/<tr><td>[-:\s]+<\/td>.*?<\/tr>/g, "");
+    .replace(/<tr><td[^>]*>[-:\s]+<\/td>.*?<\/tr>/g, "");
 
   // Wrap consecutive <li> in <ul>
-  html = html.replace(/((?:<li>.*?<\/li>\s*)+)/g, "<ul>$1</ul>");
+  html = html.replace(/((?:<li[^>]*>.*?<\/li>\s*)+)/g, '<ul style="list-style:none;padding:0;margin:0.5rem 0;background:#f8fafc;border-radius:0.5rem;padding:0.5rem 0.75rem;border:1px solid #e2e8f0">$1</ul>');
 
   // Wrap consecutive <tr> in <table>
-  html = html.replace(/((?:<tr>.*?<\/tr>\s*)+)/g, "<table>$1</table>");
+  html = html.replace(/((?:<tr>.*?<\/tr>\s*)+)/g, (match) => {
+    // Make first row a header
+    const styled = match.replace(/<tr>(.*?)<\/tr>/, (m, inner) => {
+      return '<thead><tr>' + inner.replace(/<td/g, '<th').replace(/<\/td>/g, '</th>') + '</tr></thead>';
+    });
+    return `<div style="overflow-x:auto;border-radius:0.5rem;border:1px solid #e2e8f0;margin:0.75rem 0"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">${styled}</table></div>`;
+  });
 
-  // Convert remaining newlines to <br> for paragraphs
+  // Style th elements
+  html = html.replace(/<th/g, '<th style="padding:0.6rem 0.75rem;background:#eef2ff;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:#4f46e5;border-bottom:2px solid #c7d2fe;text-align:left"');
+
+  // Convert remaining double newlines to paragraph breaks
   html = html.replace(/\n{2,}/g, "</p><p>");
   html = `<p>${html}</p>`;
-  // Clean up empty paragraphs
+  // Clean up empty paragraphs and fix nesting
   html = html.replace(/<p>\s*<\/p>/g, "");
-  html = html.replace(/<p>\s*(<h[1-4]>)/g, "$1");
+  html = html.replace(/<p>\s*(<h[1-4])/g, "$1");
   html = html.replace(/(<\/h[1-4]>)\s*<\/p>/g, "$1");
-  html = html.replace(/<p>\s*(<ul>)/g, "$1");
+  html = html.replace(/<p>\s*(<ul)/g, "$1");
   html = html.replace(/(<\/ul>)\s*<\/p>/g, "$1");
-  html = html.replace(/<p>\s*(<table>)/g, "$1");
-  html = html.replace(/(<\/table>)\s*<\/p>/g, "$1");
-  html = html.replace(/<p>\s*(<hr\/>)/g, "$1");
-  html = html.replace(/(<hr\/>)\s*<\/p>/g, "$1");
+  html = html.replace(/<p>\s*(<div)/g, "$1");
+  html = html.replace(/(<\/div>)\s*<\/p>/g, "$1");
+  html = html.replace(/<p>\s*(<hr)/g, "$1");
+  html = html.replace(/(\/>\s*)<\/p>/g, "$1");
+
+  // Style paragraphs
+  html = html.replace(/<p>/g, '<p style="font-size:0.85rem;line-height:1.7;color:#475569;margin:0.5rem 0">');
 
   return html;
 }
@@ -335,6 +349,32 @@ function ComparePageInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ── AI Comparison state ──────────────────────────────────────────────────────
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const generateAiSummary = useCallback(async () => {
+    if (hospitals.length < 2) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiSummary(null);
+    try {
+      const res = await fetch("/api/compare/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: hospitals.map((h) => h.hospitalId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "AI comparison failed");
+      setAiSummary(data.comparison);
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [hospitals]);
+
   useEffect(() => {
     if (ids.length < 2) {
       setIsLoading(false);
@@ -386,31 +426,7 @@ function ComparePageInner() {
     );
   }
 
-  // ── AI Comparison state ──────────────────────────────────────────────────────
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-
-  const generateAiSummary = useCallback(async () => {
-    if (hospitals.length < 2) return;
-    setAiLoading(true);
-    setAiError(null);
-    setAiSummary(null);
-    try {
-      const res = await fetch("/api/compare/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: hospitals.map((h) => h.hospitalId) }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "AI comparison failed");
-      setAiSummary(data.comparison);
-    } catch (err: unknown) {
-      setAiError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setAiLoading(false);
-    }
-  }, [hospitals]);
+  // Removed AI Comparison state (moved to top)
 
   // Need at least 2 resolved hospitals for a meaningful comparison
   if (hospitals.length < 2) return <EmptyCompare />;
@@ -486,27 +502,30 @@ function ComparePageInner() {
           )}
 
           {aiSummary && (
-            <div className="card p-6 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-primary" />
-                <h2 className="text-base font-bold text-foreground">AI Comparison Summary</h2>
-              </div>
-              <div
-                className="prose prose-sm max-w-none text-foreground
-                  prose-headings:text-foreground prose-headings:font-bold
-                  prose-strong:text-foreground prose-a:text-primary
-                  prose-table:text-sm prose-th:bg-slate-50 prose-th:p-2 prose-td:p-2
-                  prose-th:border prose-td:border prose-th:border-border prose-td:border-border"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(aiSummary) }}
-              />
-              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
-                <p className="text-xs text-muted">Generated by AI · Not a medical recommendation</p>
+            <div className="rounded-2xl overflow-hidden border border-indigo-100 shadow-lg shadow-indigo-100/30">
+              {/* Gradient header */}
+              <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-500 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-white">AI Comparison Summary</h2>
+                    <p className="text-xs text-indigo-100">Powered by AI · Not a medical recommendation</p>
+                  </div>
+                </div>
                 <button
                   onClick={generateAiSummary}
-                  className="text-xs font-semibold text-primary hover:underline"
+                  className="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
                 >
-                  Regenerate
+                  ↻ Regenerate
                 </button>
+              </div>
+              {/* Body */}
+              <div className="bg-white px-6 py-5">
+                <div
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(aiSummary) }}
+                />
               </div>
             </div>
           )}
@@ -564,70 +583,140 @@ function ComparePageInner() {
               </thead>
 
               <tbody className="divide-y divide-border">
-                {/* Cost */}
+                {/* Address */}
                 <TableRow
-                  label="Indicative cost"
-                  highlightIdx={costBest}
-                  cells={hospitals.map((h, i) => (
-                    <div key={i}>
-                      <p className={`font-bold ${i === costBest ? "text-success" : ""}`}>
-                        {h.costMin != null && h.costMax != null ? `${formatCost(h.costMin)} – ${formatCost(h.costMax)}` : "N/A"}
-                        {i === costBest && (
-                          <span className="ml-1 text-xs font-medium text-success/70">(lowest)</span>
-                        )}
-                      </p>
+                  label="Address"
+                  cells={hospitals.map((h) => (
+                    <div key={h.hospitalId} className="flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                      <span className="text-sm">{h.address ?? "—"}</span>
                     </div>
                   ))}
                 />
 
-                {/* Specialty */}
+                {/* Phone */}
                 <TableRow
-                  label="Specialty"
+                  label="Contact"
                   cells={hospitals.map((h) => (
-                    <span className="inline-block px-2 py-0.5 bg-primary/10 text-primary text-xs font-semibold rounded-full">
-                      {h.specialties[0] ?? "General"}
-                    </span>
-                  ))}
-                />
-
-                {/* Volume */}
-                <TableRow
-                  label="Procedures/year"
-                  highlightIdx={volumeBest}
-                  cells={hospitals.map((h, i) => (
-                    <span key={i} className={i === volumeBest ? "text-success font-semibold" : ""}>
-                      {h.annualProcedureVolume != null ? h.annualProcedureVolume.toLocaleString("en-IN") : "N/A"}
-                      {h.annualProcedureVolume != null && <span className="text-xs text-muted font-normal ml-1">(reported)</span>}
-                      {i === volumeBest && (
-                        <span className="ml-1 text-xs font-medium text-success/70">(highest)</span>
+                    <span key={h.hospitalId}>
+                      {h.phone ? (
+                        <a href={`tel:${h.phone}`} className="text-primary font-semibold text-sm hover:underline">
+                          📞 {h.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted text-sm">Not available</span>
                       )}
                     </span>
                   ))}
                 />
 
-                {/* Accreditation */}
+                {/* All Specialties */}
                 <TableRow
-                  label="Accreditation"
+                  label="Specialties"
+                  cells={hospitals.map((h) => (
+                    <div key={h.hospitalId} className="flex flex-wrap gap-1">
+                      {h.specialties.length > 0 ? h.specialties.map((s) => (
+                        <span key={s} className="inline-block px-2 py-0.5 bg-primary/10 text-primary text-xs font-semibold rounded-full">
+                          {s}
+                        </span>
+                      )) : (
+                        <span className="text-muted text-xs">Not listed</span>
+                      )}
+                    </div>
+                  ))}
+                />
+
+                {/* Facility Type */}
+                <TableRow
+                  label="Facility Type"
+                  cells={hospitals.map((h) => (
+                    <span key={h.hospitalId} className="text-sm font-medium">
+                      {h.facilityType ?? "Hospital"}
+                    </span>
+                  ))}
+                />
+
+                {/* PM-JAY */}
+                <TableRow
+                  label="PM-JAY"
                   cells={hospitals.map((h) =>
-                    h.accreditation.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {h.accreditation.map((a) => (
-                          <span
-                            key={a}
-                            className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full border border-slate-200"
-                          >
-                            {a}
-                          </span>
-                        ))}
-                      </div>
+                    h.pmjayEmpanelled ? (
+                      <span key={h.hospitalId} className="inline-flex items-center gap-1 text-success font-semibold text-xs">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Empanelled
+                      </span>
                     ) : (
-                      <span className="text-muted">—</span>
+                      <span key={h.hospitalId} className="text-muted text-xs">Not empanelled</span>
                     )
                   )}
                 />
 
+                {/* Cost — only show if at least one hospital has cost data */}
+                {hospitals.some((h) => h.costMin != null && h.costMax != null) && (
+                  <TableRow
+                    label="Indicative Cost"
+                    highlightIdx={costBest}
+                    cells={hospitals.map((h, i) => (
+                      <div key={i}>
+                        <p className={`font-bold ${i === costBest ? "text-success" : ""}`}>
+                          {h.costMin != null && h.costMax != null
+                            ? `${formatCost(h.costMin)} – ${formatCost(h.costMax)}`
+                            : "Standard PM-JAY Rates"}
+                          {i === costBest && (
+                            <span className="ml-1 text-xs font-medium text-success/70">(lowest)</span>
+                          )}
+                        </p>
+                        {h.costMin != null && h.costMax != null && (
+                          <p className="text-xs text-primary font-semibold">
+                            Avg: {formatCost(Math.round(((h.costMin ?? 0) + (h.costMax ?? 0)) / 2))}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  />
+                )}
+
+                {/* Cost display for PM-JAY hospitals when no one has cost data */}
+                {!hospitals.some((h) => h.costMin != null && h.costMax != null) && (
+                  <TableRow
+                    label="Cost Structure"
+                    cells={hospitals.map((h) => (
+                      <span key={h.hospitalId} className="text-sm">
+                        {h.pmjayEmpanelled ? (
+                          <span className="text-success font-semibold">✓ Standard PM-JAY Rates</span>
+                        ) : (
+                          "Contact for pricing"
+                        )}
+                      </span>
+                    ))}
+                  />
+                )}
+
+                {/* Accreditation — only if someone has it */}
+                {hospitals.some((h) => h.accreditation.length > 0) && (
+                  <TableRow
+                    label="Accreditation"
+                    cells={hospitals.map((h) =>
+                      h.accreditation.length > 0 ? (
+                        <div key={h.hospitalId} className="flex flex-wrap gap-1">
+                          {h.accreditation.map((a) => (
+                            <span
+                              key={a}
+                              className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full border border-slate-200"
+                            >
+                              {a}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span key={h.hospitalId} className="text-muted">—</span>
+                      )
+                    )}
+                  />
+                )}
+
                 {/* Facilities — one row per facility in the union set */}
-                {allFacilities.map((facility) => (
+                {allFacilities.length > 0 && allFacilities.map((facility) => (
                   <TableRow
                     key={facility}
                     label={facility}
@@ -641,43 +730,45 @@ function ComparePageInner() {
                   />
                 ))}
 
-                {/* PM-JAY */}
-                <TableRow
-                  label="PM-JAY"
-                  cells={hospitals.map((h) =>
-                    h.pmjayEmpanelled ? (
-                      <span className="inline-flex items-center gap-1 text-success font-semibold text-xs">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Empanelled
+                {/* ICU Beds — only if at least one has data */}
+                {hospitals.some((h) => h.icuBeds != null) && (
+                  <TableRow
+                    label="ICU Beds"
+                    highlightIdx={icuBest}
+                    cells={hospitals.map((h, i) => (
+                      <span
+                        key={i}
+                        className={`inline-flex items-center gap-1.5 ${i === icuBest ? "text-success font-semibold" : ""}`}
+                      >
+                        <BedDouble className="w-3.5 h-3.5 text-primary" />
+                        {h.icuBeds != null ? h.icuBeds : "—"}
+                        {i === icuBest && (
+                          <span className="text-xs font-medium text-success/70">(most)</span>
+                        )}
                       </span>
-                    ) : (
-                      <span className="text-muted text-xs">Not empanelled</span>
-                    )
-                  )}
-                />
+                    ))}
+                  />
+                )}
 
-                {/* ICU beds */}
-                <TableRow
-                  label="ICU beds"
-                  highlightIdx={icuBest}
-                  cells={hospitals.map((h, i) => (
-                    <span
-                      key={i}
-                      className={`inline-flex items-center gap-1.5 ${i === icuBest ? "text-success font-semibold" : ""}`}
-                    >
-                      <BedDouble className="w-3.5 h-3.5 text-primary" />
-                      {h.icuBeds != null ? h.icuBeds : "N/A"}
-                      {h.icuBeds != null && <span className="text-xs text-muted font-normal">(indicative)</span>}
-                      {i === icuBest && (
-                        <span className="text-xs font-medium text-success/70">(most)</span>
-                      )}
-                    </span>
-                  ))}
-                />
+                {/* Procedures/year — only if at least one has data */}
+                {hospitals.some((h) => h.annualProcedureVolume != null) && (
+                  <TableRow
+                    label="Procedures/Year"
+                    highlightIdx={volumeBest}
+                    cells={hospitals.map((h, i) => (
+                      <span key={i} className={i === volumeBest ? "text-success font-semibold" : ""}>
+                        {h.annualProcedureVolume != null ? h.annualProcedureVolume.toLocaleString("en-IN") : "—"}
+                        {i === volumeBest && (
+                          <span className="ml-1 text-xs font-medium text-success/70">(highest)</span>
+                        )}
+                      </span>
+                    ))}
+                  />
+                )}
 
                 {/* Verification / Source */}
                 <TableRow
-                  label="Data source"
+                  label="Data Source"
                   muted
                   cells={hospitals.map((h) => (
                     <div key={h.hospitalId} className="space-y-1">

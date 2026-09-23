@@ -53,15 +53,22 @@ function SearchResultsInner() {
     try {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("q");
+      params.delete("loc");
 
       if (rawQuery) {
         // Call natural language API
+        const locParam = searchParams.get("loc");
         const nlRes = await fetch("/api/search/natural-language", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: rawQuery })
+          body: JSON.stringify({ 
+            query: rawQuery,
+            locationContext: locParam 
+          })
         });
         
+        let fallbackCities: string[] = [];
+
         if (nlRes.ok) {
           const nlData = await nlRes.json();
           setExplanation(nlData.explanation);
@@ -71,6 +78,9 @@ function SearchResultsInner() {
           if (nlData.filters.city) params.set("city", nlData.filters.city);
           if (nlData.filters.max_budget) params.set("max_budget", nlData.filters.max_budget);
           if (nlData.filters.facilities) params.set("facilities", nlData.filters.facilities);
+          if (Array.isArray(nlData.filters.fallback_cities)) {
+            fallbackCities = nlData.filters.fallback_cities;
+          }
         }
       }
 
@@ -78,7 +88,38 @@ function SearchResultsInner() {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data: { hospitals: Hospital[]; count: number } = await res.json();
-      setHospitals(data.hospitals);
+      
+      let finalData = data;
+      
+      // Fallback if location filter is too restrictive
+      if (data.hospitals.length === 0 && params.has("city")) {
+        // If we have nearby fallback cities, try them!
+        if (fallbackCities.length > 0) {
+          console.warn(`No hospitals found in requested city. Fetching fallback cities: ${fallbackCities.join(", ")}`);
+          params.set("city", fallbackCities.join(","));
+          
+          const fallbackUrl = `/api/hospitals${params.toString() ? `?${params.toString()}` : ""}`;
+          const fallbackRes = await fetch(fallbackUrl);
+          if (fallbackRes.ok) {
+            const fbData = await fallbackRes.json();
+            if (fbData.hospitals.length > 0) {
+              finalData = fbData;
+              // Inform the user via explanation chips that location was broadened
+              setExplanation((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  chips: prev.chips.map((c: any) => 
+                    c.label === "Location" ? { ...c, value: `${c.value} (Not found - Showing nearby: ${fallbackCities.join(", ")})` } : c
+                  )
+                };
+              });
+            }
+          }
+        }
+      }
+
+      setHospitals(finalData.hospitals);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -166,8 +207,7 @@ function SearchResultsInner() {
           <ExplainabilityPanel onEditSearch={handleEditSearch} explanation={explanation} />
         </section>
 
-        {/* ── MANUAL FILTERS ── */}
-        <ManualFilters />
+        {/* Manual filters now live in the Hero section on the home page */}
 
         {/* ── 2. RESULTS TOOLBAR ── */}
         {!isLoading && !error && (

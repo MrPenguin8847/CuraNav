@@ -18,13 +18,18 @@ export const metadata: Metadata = {
     "Discover trusted hospitals, compare costs and facilities, and navigate healthcare decisions with transparent AI-powered search.",
 };
 
+import { Chatbot } from "@/components/Chatbot";
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Chatbot />
+      </body>
     </html>
   );
 }

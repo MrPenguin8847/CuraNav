@@ -50,7 +50,11 @@ export async function GET(req: NextRequest) {
     {};
 
   if (city) {
-    query = query.ilike("city", city);
+    const cities = city.split(',').map(c => c.trim()).filter(Boolean);
+    const conditions = cities.flatMap(c => [`city.ilike.%${c}%`, `state.ilike.%${c}%`, `address.ilike.%${c}%`]);
+    if (conditions.length > 0) {
+      query = query.or(conditions.join(','));
+    }
     filtersApplied.city = city;
   }
 
