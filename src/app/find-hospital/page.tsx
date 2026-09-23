@@ -9,13 +9,13 @@ import { getEstimatedCost } from "@/lib/costEstimator";
 
 export default function FindHospitalPage() {
   const router = useRouter();
-  
+
   const [city, setCity] = useState("");
   const [condition, setCondition] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
   const [locating, setLocating] = useState(false);
-  
+
   // Basic facilities check
   const [facilities, setFacilities] = useState({
     ICU: false,
@@ -62,7 +62,7 @@ export default function FindHospitalPage() {
             data.address?.county ??
             "";
           if (detectedCity) setCity(detectedCity);
-        } catch {} 
+        } catch { }
         finally { setLocating(false); }
       },
       () => setLocating(false),
@@ -76,16 +76,16 @@ export default function FindHospitalPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const params = new URLSearchParams();
     if (city.trim()) params.set("city", city.trim());
     if (specialty.trim()) params.set("specialty", specialty.trim());
     if (maxBudget.trim()) params.set("max_budget", maxBudget.trim());
-    
+
     const selectedFacilities = Object.entries(facilities)
       .filter(([_, isSelected]) => isSelected)
       .map(([fac]) => fac);
-      
+
     if (selectedFacilities.length > 0) {
       params.set("facilities", selectedFacilities.join(","));
     }
@@ -96,10 +96,10 @@ export default function FindHospitalPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
       <Header />
-      
+
       <main className="flex-grow flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-          
+
           <div className="bg-gradient-to-br from-primary to-secondary p-8 text-white text-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
             <div className="relative z-10 flex flex-col items-center">
@@ -114,12 +114,12 @@ export default function FindHospitalPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-8 sm:p-10 space-y-6">
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* City */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <label htmlFor="city" className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <MapPin className="w-4 h-4 text-primary" />
                     City / Location
                   </label>
@@ -134,6 +134,8 @@ export default function FindHospitalPage() {
                   </button>
                 </div>
                 <input
+                  id="city"
+                  name="city"
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
@@ -144,11 +146,13 @@ export default function FindHospitalPage() {
 
               {/* Disease */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <label htmlFor="condition" className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                   <Pill className="w-4 h-4 text-primary" />
                   Disease / Condition
                 </label>
                 <input
+                  id="condition"
+                  name="condition"
                   type="text"
                   value={condition}
                   onChange={(e) => setCondition(e.target.value)}
@@ -156,14 +160,16 @@ export default function FindHospitalPage() {
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
-              
+
               {/* Specialty */}
               <div className="space-y-2 md:col-span-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <label htmlFor="specialty" className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                   <Stethoscope className="w-4 h-4 text-primary" />
                   Medical Specialty (Auto-detected)
                 </label>
                 <input
+                  id="specialty"
+                  name="specialty"
                   type="text"
                   value={specialty}
                   onChange={(e) => setSpecialty(e.target.value)}
@@ -175,11 +181,13 @@ export default function FindHospitalPage() {
 
             {/* Budget */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <label htmlFor="maxBudget" className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                 <IndianRupee className="w-4 h-4 text-primary" />
                 Maximum Budget (Optional)
               </label>
               <input
+                id="maxBudget"
+                name="maxBudget"
                 type="number"
                 value={maxBudget}
                 onChange={(e) => setMaxBudget(e.target.value)}
@@ -207,11 +215,10 @@ export default function FindHospitalPage() {
                 {Object.keys(facilities).map((fac) => (
                   <label
                     key={fac}
-                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
-                      facilities[fac as keyof typeof facilities]
+                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${facilities[fac as keyof typeof facilities]
                         ? "bg-primary/10 border-primary text-primary font-semibold"
                         : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -234,7 +241,7 @@ export default function FindHospitalPage() {
                 Search Hospitals
               </button>
             </div>
-            
+
           </form>
         </div>
       </main>

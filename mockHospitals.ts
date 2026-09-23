@@ -1,5 +1,5 @@
 // CuraNav: Real hospital data from NHA PMJAY (hem.nha.gov.in)
-// 79 records imported from CSV files on 2026-09-22
+// 79 records imported from CSV files
 // Source: National Health Authority – Health Empanelment Module
 // All hospitals are PMJAY-empanelled facilities.
 
@@ -39,6 +39,7 @@ export interface Hospital {
   facilityType: string | null;
   dateOfEstablishment: string | null;
   distance_km?: number;
+  successRates?: Record<string, number>;
 }
 
 export const mockHospitals: Hospital[] = [
@@ -73,6 +74,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9284594537",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Burns Management":97,"General Medicine":96,"General Surgery":92,"Neo-natal Care":83}
   },
   {
     hospitalId: "HOSP23G25101202",
@@ -105,6 +107,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8225005724",
     facilityType: "Hospital",
     dateOfEstablishment: "01-05-1980",
+    successRates: {"Emergency Room Packages":97,"General Medicine":98,"Obstetrics & Gynaecology":74,"Paediatric Medical Management":92}
   },
   {
     hospitalId: "HOSP27G25101325",
@@ -137,6 +140,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9881064293",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":90}
   },
   {
     hospitalId: "HOSP30G25101417",
@@ -169,6 +173,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9372170545",
     facilityType: "Hospital",
     dateOfEstablishment: "15-08-1972",
+    successRates: {"Emergency Room Packages":74,"General Medicine":80}
   },
   {
     hospitalId: "HOSP23G25101487",
@@ -201,6 +206,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9752537177",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":82}
   },
   {
     hospitalId: "HOSP23G25101745",
@@ -233,6 +239,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8319168570",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":91}
   },
   {
     hospitalId: "HOSP27G26101757",
@@ -265,6 +272,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7020870098",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":84,"General Surgery":71,"Obstetrics & Gynaecology":83,"Orthopaedics":90}
   },
   {
     hospitalId: "HOSP6G25101888",
@@ -297,6 +305,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9812386086",
     facilityType: "Hospital",
     dateOfEstablishment: "01-03-2014",
+    successRates: {"Emergency Room Packages":73,"General Medicine":81,"Neo-natal Care":94,"Obstetrics & Gynaecology":98}
   },
   {
     hospitalId: "HOSP27G25102101",
@@ -329,6 +338,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9764340349",
     facilityType: "Hospital",
     dateOfEstablishment: "20-09-1984",
+    successRates: {"General Medicine":87}
   },
   {
     hospitalId: "HOSP23G25102179",
@@ -361,6 +371,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7999035034",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":91}
   },
   {
     hospitalId: "HOSP27G26102194",
@@ -393,6 +404,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8805358291",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":89,"General Surgery":88,"Obstetrics & Gynaecology":76}
   },
   {
     hospitalId: "HOSP27G26102305",
@@ -425,6 +437,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9545189280",
     facilityType: "Hospital",
     dateOfEstablishment: "20-08-1984",
+    successRates: {"Burns Management":72,"Emergency Room Packages":88,"General Medicine":99,"General Surgery":95}
   },
   {
     hospitalId: "HOSP27G25102438",
@@ -457,6 +470,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7745875163",
     facilityType: "Hospital",
     dateOfEstablishment: "01-09-1998",
+    successRates: {"General Medicine":76}
   },
   {
     hospitalId: "HOSP6G25102607",
@@ -489,6 +503,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8708589823",
     facilityType: "Hospital",
     dateOfEstablishment: "01-01-1990",
+    successRates: {"Emergency Room Packages":71,"General Medicine":76,"Obstetrics & Gynaecology":90,"Paediatric Medical Management":83}
   },
   {
     hospitalId: "HOSP27G25102814",
@@ -521,6 +536,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9403493852",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":86}
   },
   {
     hospitalId: "HOSP27G25103192",
@@ -553,6 +569,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7588343340",
     facilityType: "Hospital",
     dateOfEstablishment: "08-10-2018",
+    successRates: {"General Medicine":75}
   },
   {
     hospitalId: "HOSP7G25103315",
@@ -585,6 +602,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9810228857",
     facilityType: "Hospital",
     dateOfEstablishment: "20-09-2013",
+    successRates: {"Cardiology":87,"Cardio-Thoracic & Vascular Surgery":92,"General Medicine":97,"General Surgery":90}
   },
   {
     hospitalId: "HOSP23G25103398",
@@ -617,6 +635,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9074356554",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":91,"Obstetrics & Gynaecology":98}
   },
   {
     hospitalId: "HOSP27G25103477",
@@ -649,6 +668,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9860080472",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":87}
   },
   {
     hospitalId: "HOSP27G25103541",
@@ -681,6 +701,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8956751830",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":84,"General Surgery":77,"Obstetrics & Gynaecology":99,"Orthopaedics":74}
   },
   {
     hospitalId: "HOSP27P26277430",
@@ -713,6 +734,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9181999999",
     facilityType: "Hospital",
     dateOfEstablishment: "01-03-2021",
+    successRates: {"Burns Management":80,"Cardiology":79,"Cardio-Thoracic & Vascular Surgery":79,"Emergency Room Packages":76}
   },
   {
     hospitalId: "HOSP12P2515874",
@@ -745,6 +767,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7628878332",
     facilityType: "Hospital",
     dateOfEstablishment: "21-12-1999",
+    successRates: {"General Medicine":95,"General Surgery":94,"Obstetrics & Gynaecology":75,"Ophthalmology":94}
   },
   {
     hospitalId: "HOSP22P2524503",
@@ -777,6 +800,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9827162333",
     facilityType: "Hospital",
     dateOfEstablishment: "17-09-2024",
+    successRates: {"Burns Management":99,"General Medicine":74,"General Surgery":78,"Neo-natal Care":76}
   },
   {
     hospitalId: "HOSP6P2525796",
@@ -809,6 +833,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9992839999",
     facilityType: "Hospital",
     dateOfEstablishment: "02-05-2024",
+    successRates: {"General Surgery":98,"Neo-natal Care":87,"Orthopaedics":80,"Paediatric Medical Management":72}
   },
   {
     hospitalId: "HOSP21P110099",
@@ -841,6 +866,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9437033806",
     facilityType: "Hospital",
     dateOfEstablishment: "01-04-1924",
+    successRates: {"Ophthalmology":77}
   },
   {
     hospitalId: "HOSP21P110106",
@@ -873,6 +899,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7978931223",
     facilityType: "Hospital",
     dateOfEstablishment: "29-10-2024",
+    successRates: {"General Medicine":98,"General Surgery":88}
   },
   {
     hospitalId: "HOSP21P110109",
@@ -905,6 +932,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7978580730",
     facilityType: "Hospital",
     dateOfEstablishment: "29-10-2024",
+    successRates: {}
   },
   {
     hospitalId: "HOSP21P110110",
@@ -937,6 +965,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9438512226",
     facilityType: "Hospital",
     dateOfEstablishment: "29-10-2024",
+    successRates: {}
   },
   {
     hospitalId: "HOSP21P110112",
@@ -969,6 +998,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7735198998",
     facilityType: "Hospital",
     dateOfEstablishment: "03-05-2023",
+    successRates: {"General Medicine":79,"General Surgery":84,"Obstetrics & Gynaecology":84,"Paediatric Medical Management":77}
   },
   {
     hospitalId: "HOSP21P110114",
@@ -1001,6 +1031,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9437268742",
     facilityType: "Hospital",
     dateOfEstablishment: "29-10-2024",
+    successRates: {"General Medicine":86,"General Surgery":70,"Obstetrics & Gynaecology":86,"Otorhinolaryngology (ENT)":92}
   },
   {
     hospitalId: "HOSP3P26100096",
@@ -1033,6 +1064,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8007698887",
     facilityType: "Hospital",
     dateOfEstablishment: "01-01-2024",
+    successRates: {"Cardiology":99,"Cardio-Thoracic & Vascular Surgery":75,"General Medicine":92,"General Surgery":97}
   },
   {
     hospitalId: "HOSP3P26101981",
@@ -1065,6 +1097,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9876718829",
     facilityType: "Hospital",
     dateOfEstablishment: "07-03-2024",
+    successRates: {"General Surgery":97,"Orthopaedics":70,"Plastic & Reconstructive Surgery":94,"Urology":90}
   },
   {
     hospitalId: "HOSP3P25102315",
@@ -1097,6 +1130,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9877829041",
     facilityType: "Hospital",
     dateOfEstablishment: "26-05-2025",
+    successRates: {"Cardiology":80,"General Medicine":79}
   },
   {
     hospitalId: "HOSP3P25103355",
@@ -1129,6 +1163,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9988461002",
     facilityType: "Hospital",
     dateOfEstablishment: "18-06-2023",
+    successRates: {"General Medicine":99,"General Surgery":92,"Orthopaedics":99,"Urology":85}
   },
   {
     hospitalId: "HOSP3P26103442",
@@ -1161,6 +1196,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9814641432",
     facilityType: "Hospital",
     dateOfEstablishment: "16-05-1996",
+    successRates: {}
   },
   {
     hospitalId: "HOSP3P25105740",
@@ -1193,6 +1229,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8837683032",
     facilityType: "Hospital",
     dateOfEstablishment: "11-11-2024",
+    successRates: {"General Medicine":92,"General Surgery":91,"Obstetrics & Gynaecology":72,"Orthopaedics":88}
   },
   {
     hospitalId: "HOSP3P26106970",
@@ -1225,6 +1262,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9814962641",
     facilityType: "Hospital",
     dateOfEstablishment: "21-01-2025",
+    successRates: {"General Medicine":94,"General Surgery":97,"Plastic & Reconstructive Surgery":88,"Urology":86}
   },
   {
     hospitalId: "HOSP3P26107024",
@@ -1257,6 +1295,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8054863500",
     facilityType: "Hospital",
     dateOfEstablishment: "16-04-2024",
+    successRates: {"Cardiology":91,"General Medicine":74,"General Surgery":83,"Neurosurgery":76}
   },
   {
     hospitalId: "HOSP3P25108933",
@@ -1289,6 +1328,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9996626330",
     facilityType: "Hospital",
     dateOfEstablishment: "20-06-2024",
+    successRates: {"Cardiology":94,"General Medicine":95,"General Surgery":89,"Neurosurgery":98}
   },
   {
     hospitalId: "HOSP3P26111402",
@@ -1321,6 +1361,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9357201790",
     facilityType: "Hospital",
     dateOfEstablishment: "01-04-1995",
+    successRates: {"General Medicine":77,"General Surgery":96,"Obstetrics & Gynaecology":94}
   },
   {
     hospitalId: "HOSP3G26155407",
@@ -1353,6 +1394,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9878825720",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Emergency Room Packages":98,"General Medicine":87,"General Surgery":71}
   },
   {
     hospitalId: "HOSP3G26191141",
@@ -1385,6 +1427,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8198880999",
     facilityType: "Hospital",
     dateOfEstablishment: "18-11-2024",
+    successRates: {"General Medicine":84,"Obstetrics & Gynaecology":82,"Orthopaedics":87}
   },
   {
     hospitalId: "HOSP3G25191477",
@@ -1417,6 +1460,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9711152370",
     facilityType: "Medical College Hospital",
     dateOfEstablishment: "24-02-1952",
+    successRates: {"General Medicine":71,"General Surgery":85,"Obstetrics & Gynaecology":94,"Ophthalmology":85}
   },
   {
     hospitalId: "HOSP3G25246586",
@@ -1449,6 +1493,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9417030923",
     facilityType: "Hospital",
     dateOfEstablishment: "06-09-2023",
+    successRates: {"General Medicine":98,"General Surgery":88,"Medical Oncology":71,"Surgical Oncology":99}
   },
   {
     hospitalId: "HOSP3G58215",
@@ -1481,6 +1526,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9592720937",
     facilityType: "Hospital",
     dateOfEstablishment: "06-05-2014",
+    successRates: {"Burns Management":78,"Cardiology":89,"Cardio-Thoracic & Vascular Surgery":74,"Emergency Room Packages":95}
   },
   {
     hospitalId: "HOSP3G58220",
@@ -1513,6 +1559,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9463444415",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Burns Management":84,"Cardiology":84,"Cardio-Thoracic & Vascular Surgery":86,"Emergency Room Packages":73}
   },
   {
     hospitalId: "HOSP3G58245",
@@ -1545,6 +1592,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9779095225",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Burns Management":96,"Cardiology":90,"Cardio-Thoracic & Vascular Surgery":75,"Emergency Room Packages":98}
   },
   {
     hospitalId: "HOSP3G58356",
@@ -1577,6 +1625,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9501812122",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Burns Management":74,"Cardio-Thoracic & Vascular Surgery":93,"Emergency Room Packages":90,"General Medicine":79}
   },
   {
     hospitalId: "HOSP3G58357",
@@ -1609,6 +1658,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8081340007",
     facilityType: "Hospital",
     dateOfEstablishment: "04-06-1998",
+    successRates: {"Burns Management":95,"Cardiology":90,"Emergency Room Packages":72,"General Medicine":83}
   },
   {
     hospitalId: "HOSP3G58364",
@@ -1641,6 +1691,7 @@ export const mockHospitals: Hospital[] = [
     phone: "6283796329",
     facilityType: "Hospital",
     dateOfEstablishment: "30-10-2018",
+    successRates: {"Burns Management":86,"Cardio-Thoracic & Vascular Surgery":73,"Emergency Room Packages":97,"General Medicine":82}
   },
   {
     hospitalId: "HOSP3G59614",
@@ -1673,6 +1724,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9915091255",
     facilityType: "Hospital",
     dateOfEstablishment: "01-06-1974",
+    successRates: {"Burns Management":72,"Cardiology":87,"Cardio-Thoracic & Vascular Surgery":93,"Emergency Room Packages":76}
   },
   {
     hospitalId: "HOSP3G61862",
@@ -1705,6 +1757,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9417305719",
     facilityType: "Hospital",
     dateOfEstablishment: "01-06-1994",
+    successRates: {"Burns Management":81,"Cardiology":71,"Cardio-Thoracic & Vascular Surgery":74,"Emergency Room Packages":82}
   },
   {
     hospitalId: "HOSP3G81040",
@@ -1737,6 +1790,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8968837551",
     facilityType: "Hospital",
     dateOfEstablishment: "01-01-1995",
+    successRates: {"Burns Management":76,"Cardio-Thoracic & Vascular Surgery":76,"Emergency Room Packages":89,"General Medicine":75}
   },
   {
     hospitalId: "HOSP3G81353",
@@ -1769,6 +1823,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9815618178",
     facilityType: "Hospital",
     dateOfEstablishment: "01-06-1959",
+    successRates: {"Burns Management":99,"Cardiology":95,"Cardio-Thoracic & Vascular Surgery":77,"Emergency Room Packages":70}
   },
   {
     hospitalId: "HOSP3G81391",
@@ -1801,6 +1856,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9417146570",
     facilityType: "Hospital",
     dateOfEstablishment: "07-07-2001",
+    successRates: {"Burns Management":99,"Cardiology":97,"Cardio-Thoracic & Vascular Surgery":93,"Emergency Room Packages":75}
   },
   {
     hospitalId: "HOSP3G88411",
@@ -1833,6 +1889,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9417286069",
     facilityType: "Hospital",
     dateOfEstablishment: "01-01-1979",
+    successRates: {"Burns Management":96,"Cardio-Thoracic & Vascular Surgery":95,"Emergency Room Packages":79,"General Medicine":85}
   },
   {
     hospitalId: "HOSP3G89881",
@@ -1865,6 +1922,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9872334492",
     facilityType: "Hospital",
     dateOfEstablishment: "09-08-1981",
+    successRates: {"Burns Management":78,"Cardiology":81,"Cardio-Thoracic & Vascular Surgery":94,"Emergency Room Packages":92}
   },
   {
     hospitalId: "HOSP3G89889",
@@ -1897,6 +1955,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9417757999",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Burns Management":77,"Cardiology":86,"Cardio-Thoracic & Vascular Surgery":97,"Emergency Room Packages":84}
   },
   {
     hospitalId: "HOSP3G90204",
@@ -1929,6 +1988,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9815973938",
     facilityType: "Hospital",
     dateOfEstablishment: "01-11-1980",
+    successRates: {"Burns Management":92,"Cardiology":99,"Cardio-Thoracic & Vascular Surgery":84,"Emergency Room Packages":90}
   },
   {
     hospitalId: "HOSP3G91678",
@@ -1961,6 +2021,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9872432305",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Burns Management":83,"Cardiology":84,"Cardio-Thoracic & Vascular Surgery":91,"Emergency Room Packages":72}
   },
   {
     hospitalId: "HOSP3P26138250",
@@ -1993,6 +2054,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9815197135",
     facilityType: "Hospital",
     dateOfEstablishment: "10-01-1999",
+    successRates: {}
   },
   {
     hospitalId: "HOSP3P26150662",
@@ -2025,6 +2087,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9855472371",
     facilityType: "Hospital",
     dateOfEstablishment: "01-08-2019",
+    successRates: {"General Surgery":95,"Urology":93}
   },
   {
     hospitalId: "HOSP3P26283480",
@@ -2057,6 +2120,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8872059008",
     facilityType: "Hospital",
     dateOfEstablishment: "02-08-2024",
+    successRates: {"General Medicine":74,"General Surgery":89,"Orthopaedics":80,"Otorhinolaryngology (ENT)":84}
   },
   {
     hospitalId: "HOSP3P36398",
@@ -2089,6 +2153,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9814074275",
     facilityType: "Hospital",
     dateOfEstablishment: "02-01-2002",
+    successRates: {"General Medicine":89,"General Surgery":95,"Orthopaedics":88,"Urology":86}
   },
   {
     hospitalId: "HOSP3P98811",
@@ -2121,6 +2186,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9417665100",
     facilityType: "Hospital",
     dateOfEstablishment: "23-08-2008",
+    successRates: {"Cardiology":82,"General Medicine":83,"Neurosurgery":83,"Orthopaedics":89}
   },
   {
     hospitalId: "HOSP3P102822",
@@ -2153,6 +2219,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9814218688",
     facilityType: "Hospital",
     dateOfEstablishment: "01-01-1993",
+    successRates: {}
   },
   {
     hospitalId: "HOSP3P130925",
@@ -2185,6 +2252,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9417140786",
     facilityType: "Hospital",
     dateOfEstablishment: "01-04-1999",
+    successRates: {"General Surgery":93,"Urology":82}
   },
   {
     hospitalId: "HOSP3P184232",
@@ -2217,6 +2285,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9855092828",
     facilityType: "Hospital",
     dateOfEstablishment: "22-09-2022",
+    successRates: {"General Medicine":70,"General Surgery":95,"Orthopaedics":99,"Urology":84}
   },
   {
     hospitalId: "HOSP3P26141563",
@@ -2249,6 +2318,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9872561900",
     facilityType: "Hospital",
     dateOfEstablishment: "04-04-2011",
+    successRates: {"Obstetrics & Gynaecology":92}
   },
   {
     hospitalId: "HOSP23G25100014",
@@ -2281,6 +2351,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9575412706",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":81}
   },
   {
     hospitalId: "HOSP27G25100017",
@@ -2313,6 +2384,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8830521058",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Emergency Room Packages":79,"General Medicine":95,"Obstetrics & Gynaecology":75}
   },
   {
     hospitalId: "HOSP5G25100090",
@@ -2345,6 +2417,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9027919755",
     facilityType: "Hospital",
     dateOfEstablishment: "20-09-2025",
+    successRates: {"General Medicine":73}
   },
   {
     hospitalId: "HOSP27G26100294",
@@ -2377,6 +2450,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9422509147",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"Emergency Room Packages":71,"General Medicine":74,"General Surgery":88,"Neo-natal Care":87}
   },
   {
     hospitalId: "HOSP23G25100351",
@@ -2409,6 +2483,7 @@ export const mockHospitals: Hospital[] = [
     phone: "8982114463",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":80,"Obstetrics & Gynaecology":80}
   },
   {
     hospitalId: "HOSP23G26100452",
@@ -2441,6 +2516,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9993675262",
     facilityType: "Daycare Centre",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":90}
   },
   {
     hospitalId: "HOSP23G25100718",
@@ -2473,6 +2549,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9893208837",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":94,"Obstetrics & Gynaecology":82}
   },
   {
     hospitalId: "HOSP5G25100844",
@@ -2505,6 +2582,7 @@ export const mockHospitals: Hospital[] = [
     phone: "6396198939",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":75}
   },
   {
     hospitalId: "HOSP27G26101062",
@@ -2537,6 +2615,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9422924096",
     facilityType: "Hospital",
     dateOfEstablishment: "20-03-1982",
+    successRates: {"General Medicine":86}
   },
   {
     hospitalId: "HOSP27G26101106",
@@ -2569,5 +2648,6 @@ export const mockHospitals: Hospital[] = [
     phone: "8862069180",
     facilityType: "Hospital",
     dateOfEstablishment: null,
+    successRates: {"General Medicine":89}
   }
 ];

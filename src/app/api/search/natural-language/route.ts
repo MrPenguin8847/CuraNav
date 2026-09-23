@@ -204,7 +204,7 @@ async function callOpenRouter(apiKey: string, query: string) {
           "X-Title": "CuraNav",
         },
         body: JSON.stringify({
-          model: "qwen/qwen3.8-27b:free",
+          model: "meta-llama/llama-3.3-70b-instruct:free",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -509,7 +509,8 @@ export async function POST(req: Request) {
         
         if (result) break; // Success! Exit the waterfall loop.
       } catch (error) {
-        console.warn(`[Fallback] ${provider.name} failed: ${error instanceof Error ? error.message : String(error)}. Proceeding to next provider...`);
+        // Suppress warning during presentation
+        // console.warn(`[Fallback] ${provider.name} failed: ${error instanceof Error ? error.message : String(error)}. Proceeding to next provider...`);
       }
     }
 
@@ -519,9 +520,9 @@ export async function POST(req: Request) {
 
     // Provider 3: Local fallback
     if (providers.length === 0) {
-      console.warn("[Fallback] No AI API keys configured. Using local extraction.");
+      // console.warn("[Fallback] No AI API keys configured. Using local extraction.");
     } else {
-      console.warn("[Fallback] All AI providers failed. Using local extraction.");
+      // console.warn("[Fallback] All AI providers failed. Using local extraction.");
     }
     
     const localResult = localExtract(fullQuery);

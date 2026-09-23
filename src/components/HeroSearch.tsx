@@ -15,6 +15,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
   const router = useRouter();
   const { stats, loading: statsLoading } = usePlatformStats();
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
 
@@ -60,14 +61,23 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
       const locationContext = locationLabel
         ? `&loc=${encodeURIComponent(locationLabel)}`
         : "";
-      router.push(`/search?q=${encodeURIComponent(query)}${locationContext}`);
+      const coordsContext = locationCoords
+        ? `&lat=${locationCoords.lat}&lon=${locationCoords.lon}`
+        : "";
+      router.push(`/search?q=${encodeURIComponent(query)}${locationContext}${coordsContext}`);
     }
   };
 
   const handleFilterSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
-    if (city.trim()) params.set("city", city.trim());
+    if (city.trim()) {
+      params.set("city", city.trim());
+      if (locationCoords && locationLabel && locationLabel.toLowerCase().includes(city.trim().toLowerCase())) {
+        params.set("lat", locationCoords.lat.toString());
+        params.set("lon", locationCoords.lon.toString());
+      }
+    }
     if (condition.trim()) params.set("condition", condition.trim());
     if (specialty.trim()) params.set("specialty", specialty.trim());
     if (maxBudget.trim()) params.set("max_budget", maxBudget.trim());
@@ -108,6 +118,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
           const label = [detectedCity, state].filter(Boolean).join(", ");
           if (label) {
             setLocationLabel(label);
+            setLocationCoords({ lat: latitude, lon: longitude });
             setCity(detectedCity); // auto-fill filter city
             setLocError(null);
           } else {
@@ -171,7 +182,10 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <label htmlFor="search-query" className="sr-only">Search query</label>
                   <input
+                    id="search-query"
+                    name="q"
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -223,7 +237,10 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                   {locationLabel}
                   <button
                     type="button"
-                    onClick={() => setLocationLabel(null)}
+                    onClick={() => {
+                      setLocationLabel(null);
+                      setLocationCoords(null);
+                    }}
                     className="ml-1 text-success/60 hover:text-success transition-colors text-sm leading-none"
                     aria-label="Remove location"
                   >
@@ -245,10 +262,12 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-city" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       <MapPin className="w-3 h-3" /> City / Location
                     </label>
                     <input
+                      id="filter-city"
+                      name="city"
                       type="text"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
@@ -257,10 +276,12 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-condition" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       <Pill className="w-3 h-3" /> Disease / Condition
                     </label>
                     <input
+                      id="filter-condition"
+                      name="condition"
                       type="text"
                       value={condition}
                       onChange={(e) => setCondition(e.target.value)}
@@ -269,10 +290,12 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-specialty" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       <Stethoscope className="w-3 h-3" /> Specialty (Auto-detected)
                     </label>
                     <input
+                      id="filter-specialty"
+                      name="specialty"
                       type="text"
                       value={specialty}
                       onChange={(e) => setSpecialty(e.target.value)}
@@ -281,10 +304,12 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-budget" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       <IndianRupee className="w-3 h-3" /> Max Budget (₹)
                     </label>
                     <input
+                      id="filter-budget"
+                      name="maxBudget"
                       type="number"
                       value={maxBudget}
                       onChange={(e) => setMaxBudget(e.target.value)}

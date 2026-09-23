@@ -41,6 +41,7 @@ function SearchResultsInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<{ query: string; chips: any[] } | null>(null);
+  const [nlFilters, setNlFilters] = useState<Record<string, string | number | null>>({}); // NL-extracted filters
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [sort, setSort] = useState<SortKey>("match");
@@ -71,12 +72,12 @@ function SearchResultsInner() {
         const nlRes = await fetch("/api/search/natural-language", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             query: rawQuery,
-            locationContext: locParam 
+            locationContext: locParam
           })
         });
-        
+
 
         if (nlRes.ok) {
           const nlData = await nlRes.json();
@@ -92,7 +93,7 @@ function SearchResultsInner() {
             setIsLoading(false);
             return; // Stop here — wait for user to provide location
           }
-          
+
           if (nlData.filters.condition) params.set("condition", nlData.filters.condition);
           if (nlData.filters.specialty) params.set("specialty", nlData.filters.specialty);
           if (nlData.filters.city) params.set("city", nlData.filters.city);
@@ -106,6 +107,17 @@ function SearchResultsInner() {
           if (Array.isArray(nlData.filters.fallback_cities)) {
             fallbackCities = nlData.filters.fallback_cities;
           }
+
+          // Store NL-extracted filters in state so activeFilters (and HospitalCard) can use them
+          setNlFilters({
+            condition: nlData.filters.condition ?? null,
+            specialty: nlData.filters.specialty ?? null,
+            city: nlData.filters.city ?? null,
+            radius_km: nlData.filters.radius_km ?? null,
+            min_budget: nlData.filters.min_budget ?? null,
+            max_budget: nlData.filters.max_budget ?? null,
+            facilities: nlData.filters.facilities ?? null,
+          });
         }
       }
 
@@ -113,16 +125,16 @@ function SearchResultsInner() {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data: { hospitals: Hospital[]; count: number } = await res.json();
-      
+
       let finalData = data;
-      
+
       // Fallback if location filter is too restrictive
       if (data.hospitals.length === 0 && params.has("city")) {
         // If we have nearby fallback cities, try them!
         if (fallbackCities.length > 0) {
           console.warn(`No hospitals found in requested city. Fetching fallback cities: ${fallbackCities.join(", ")}`);
           params.set("city", fallbackCities.join(","));
-          
+
           const fallbackUrl = `/api/hospitals${params.toString() ? `?${params.toString()}` : ""}`;
           const fallbackRes = await fetch(fallbackUrl);
           if (fallbackRes.ok) {
@@ -134,7 +146,7 @@ function SearchResultsInner() {
                 if (!prev) return prev;
                 return {
                   ...prev,
-                  chips: prev.chips.map((c: any) => 
+                  chips: prev.chips.map((c: any) =>
                     c.label === "Location" ? { ...c, value: `${c.value} (Not found - Showing nearby: ${fallbackCities.join(", ")})` } : c
                   )
                 };
@@ -224,17 +236,19 @@ function SearchResultsInner() {
   const showEmpty = !isLoading && !error && resultCount === 0;
 
   const activeFilters = useMemo(() => {
+    // Merge URL params (manual filters) with NL-extracted filters (from natural-language query)
+    // URL params take priority over NL-extracted ones if both exist
     return {
-      condition: searchParams.get("condition"),
-      specialty: searchParams.get("specialty"),
-      city: searchParams.get("city"),
-      radius_km: searchParams.get("radius_km") ? Number(searchParams.get("radius_km")) : null,
-      min_budget: searchParams.get("min_budget") ? Number(searchParams.get("min_budget")) : null,
-      max_budget: searchParams.get("max_budget") ? Number(searchParams.get("max_budget")) : null,
-      facilities: searchParams.get("facilities"),
+      condition: searchParams.get("condition") ?? (nlFilters.condition as string | null) ?? null,
+      specialty: searchParams.get("specialty") ?? (nlFilters.specialty as string | null) ?? null,
+      city: searchParams.get("city") ?? (nlFilters.city as string | null) ?? null,
+      radius_km: searchParams.get("radius_km") ? Number(searchParams.get("radius_km")) : (nlFilters.radius_km as number | null) ?? null,
+      min_budget: searchParams.get("min_budget") ? Number(searchParams.get("min_budget")) : (nlFilters.min_budget as number | null) ?? null,
+      max_budget: searchParams.get("max_budget") ? Number(searchParams.get("max_budget")) : (nlFilters.max_budget as number | null) ?? null,
+      facilities: searchParams.get("facilities") ?? (nlFilters.facilities as string | null) ?? null,
       sort_by: sort, // Use React state, not URL param
     };
-  }, [searchParams, sort]);
+  }, [searchParams, nlFilters, sort]);
 
   // ── Location prompt handler ──────────────────────────────────────────────
   const handleLocationGrant = () => {
@@ -251,9 +265,10 @@ function SearchResultsInner() {
           const data = await res.json();
           const detectedCity = data.address?.city ?? data.address?.town ?? data.address?.village ?? data.address?.county ?? "";
           if (detectedCity) {
-            // Re-run the search with the location context
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.set("loc", detectedCity);
+            currentUrl.searchParams.set("lat", latitude.toString());
+            currentUrl.searchParams.set("lon", longitude.toString());
             setShowLocationPrompt(false);
             setPendingNlData(null);
             router.replace(currentUrl.pathname + currentUrl.search);

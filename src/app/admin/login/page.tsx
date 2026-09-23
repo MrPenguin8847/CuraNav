@@ -60,10 +60,13 @@ export default function AdminLogin() {
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
                   Email Address
                 </label>
                 <input
+                  id="email"
+                  name="email"
+                  autoComplete="email"
                   type="email"
                   required
                   value={email}
@@ -74,10 +77,13 @@ export default function AdminLogin() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
                   Password
                 </label>
                 <input
+                  id="password"
+                  name="password"
+                  autoComplete="current-password"
                   type="password"
                   required
                   value={password}

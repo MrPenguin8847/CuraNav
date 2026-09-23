@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
   const minBudget = searchParams.get("min_budget");
   const maxBudget = searchParams.get("max_budget");
   const radiusKm = searchParams.get("radius_km");
+  const latParam = searchParams.get("lat");
+  const lonParam = searchParams.get("lon");
   const facilitiesParam = searchParams.get("facilities");
   const verifiedOnly = searchParams.get("verified_only") === "true";
   const isAdmin = searchParams.get("admin") === "true";
@@ -78,13 +80,26 @@ export async function GET(req: NextRequest) {
     const isWholeCountry = lowerCity === "india" || lowerCity === "bharat";
 
     if (!isWholeCountry) {
-      // If radius is provided, we don't strictly filter by city name string match in DB,
+      // If radius is provided (or coords), we don't strictly filter by city name string match in DB,
       // because we will filter by coordinates later. But we still record it.
-      if (!radiusKm) {
-        const cities = city.split(',').map(c => c.trim()).filter(Boolean);
-        const conditions = cities.flatMap(c => [`city.ilike.%${c}%`, `state.ilike.%${c}%`, `address.ilike.%${c}%`]);
-        if (conditions.length > 0) {
+      if (!radiusKm && !latParam && !lonParam) {
+        // Smarter location matching: ignore stop words and match any significant word
+        const stopWords = ["in", "near", "at", "of", "the", "city", "village", "town", "district"];
+        const locationWords = city
+          .toLowerCase()
+          .split(/[\s,]+/)
+          .filter(w => w.length > 2 && !stopWords.includes(w));
+
+        if (locationWords.length > 0) {
+          const conditions = locationWords.flatMap(w => [
+            `city.ilike.%${w}%`, 
+            `state.ilike.%${w}%`, 
+            `address.ilike.%${w}%`
+          ]);
           query = query.or(conditions.join(','));
+        } else {
+          // Fallback to exact match if only short words
+          query = query.or(`city.ilike.%${city.trim()}%,state.ilike.%${city.trim()}%,address.ilike.%${city.trim()}%`);
         }
       }
     }
@@ -192,21 +207,88 @@ export async function GET(req: NextRequest) {
   let hospitals = (data ?? []).map(mapHospital);
 
   // Handle geographical radius filtering in memory
-  if (city && radiusKm) {
-    const radius = parseFloat(radiusKm);
+  let coords: { lat: number; lon: number } | null = null;
+  let radius = radiusKm ? parseFloat(radiusKm) : 50; // default 50km radius for coord search
+
+  if (latParam && lonParam) {
+    coords = { lat: parseFloat(latParam), lon: parseFloat(lonParam) };
+  } else if (city) {
     const firstCity = city.split(',')[0].trim().toLowerCase();
-    const coords = CITY_COORDS[firstCity];
+    coords = CITY_COORDS[firstCity] ?? null;
+  }
+
+  if (coords && !isNaN(coords.lat) && !isNaN(coords.lon) && !isNaN(radius)) {
+    filtersApplied.radius_km = radius;
     
-    if (coords && !isNaN(radius)) {
-      filtersApplied.radius_km = radius;
-      
-      hospitals = hospitals.map(h => {
-        if (h.latitude && h.longitude) {
-          const dist = haversine(coords.lat, coords.lon, h.latitude, h.longitude);
-          return { ...h, distance_km: dist };
+    hospitals = hospitals.map(h => {
+      if (h.latitude && h.longitude) {
+        const dist = haversine(coords!.lat, coords!.lon, h.latitude, h.longitude);
+        return { ...h, distance_km: dist };
+      }
+      return h;
+    }).filter(h => h.distance_km !== undefined && h.distance_km <= radius);
+  }
+
+  // ── Geocoding fallback ────────────────────────────────────────────────────
+  // If the city text filter returned 0 results AND we don't have coordinates,
+  // try to geocode the city name to get coordinates, then do a radius search
+  // against ALL approved hospitals.
+  if (hospitals.length === 0 && city && !coords) {
+    try {
+      const geocodeRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&countrycodes=in`,
+        { headers: { "User-Agent": "CuraNav/1.0 (https://curanav.vercel.app)" } }
+      );
+      if (geocodeRes.ok) {
+        const geocodeData = await geocodeRes.json();
+        if (Array.isArray(geocodeData) && geocodeData.length > 0) {
+          const geoLat = parseFloat(geocodeData[0].lat);
+          const geoLon = parseFloat(geocodeData[0].lon);
+          
+          if (!isNaN(geoLat) && !isNaN(geoLon)) {
+            // Re-fetch ALL approved hospitals (no city text filter)
+            let retryQuery = supabaseAdmin.from("hospitals").select("*");
+            if (!isAdmin) {
+              retryQuery = retryQuery.eq("review_status", "approved");
+            }
+            retryQuery = retryQuery
+              .order("verification_status", { ascending: true })
+              .order("cost_min", { ascending: true });
+            
+            const { data: retryData } = await retryQuery;
+            if (retryData && retryData.length > 0) {
+              const geoRadius = radiusKm ? parseFloat(radiusKm) : 100; // wider 100km radius for geocoded fallback
+              hospitals = retryData.map(mapHospital).map(h => {
+                if (h.latitude && h.longitude) {
+                  const dist = haversine(geoLat, geoLon, h.latitude, h.longitude);
+                  return { ...h, distance_km: dist };
+                }
+                return h;
+              }).filter(h => h.distance_km !== undefined && h.distance_km <= geoRadius);
+              
+              filtersApplied.geocoded = true;
+              filtersApplied.radius_km = geoRadius;
+            }
+          }
         }
-        return h;
-      }).filter(h => h.distance_km !== undefined && h.distance_km <= radius);
+      }
+    } catch {
+      // Geocoding failed silently — return empty results
+    }
+  }
+
+  // ── Sort by Success Rate ──────────────────────────────────────────────────
+  if (resolvedSpecialty) {
+    const targetSpecs = resolvedSpecialty.split(',').map(s => s.trim()).filter(Boolean);
+    if (targetSpecs.length > 0) {
+      hospitals.sort((a, b) => {
+        const maxRateA = Math.max(0, ...targetSpecs.map(spec => a.successRates?.[spec] ?? 0));
+        const maxRateB = Math.max(0, ...targetSpecs.map(spec => b.successRates?.[spec] ?? 0));
+        if (maxRateB !== maxRateA) {
+          return maxRateB - maxRateA; // descending
+        }
+        return 0;
+      });
     }
   }
 

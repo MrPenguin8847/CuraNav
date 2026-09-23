@@ -121,7 +121,7 @@ IMPORTANT RULES:
               "X-Title": "CuraNav",
             },
             body: JSON.stringify({
-              model: "qwen/qwen3.8-27b:free",
+              model: "meta-llama/llama-3.3-70b-instruct:free",
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },
@@ -182,7 +182,8 @@ IMPORTANT RULES:
         
         if (aiResponse) break; // Success! Exit waterfall loop.
       } catch (err) {
-        console.warn(`[AI Compare] ${provider.name} failed: ${err instanceof Error ? err.message : String(err)}. Proceeding to next...`);
+        // Suppress console warnings during presentation
+        // console.warn(`[AI Compare] ${provider.name} failed: ${err instanceof Error ? err.message : String(err)}. Proceeding to next...`);
         lastError = err;
       }
     }

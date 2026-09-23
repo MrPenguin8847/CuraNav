@@ -40,5 +40,6 @@ export function mapHospital(row: Record<string, any>): Hospital {
     phone: row.phone ?? null,
     facilityType: row.facility_type ?? null,
     dateOfEstablishment: row.date_of_establishment ?? null,
+    successRates: row.success_rates ?? {},
   };
 }

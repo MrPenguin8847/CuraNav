@@ -28,7 +28,8 @@ create table if not exists hospitals (
   last_updated           date not null,
   data_status            text not null default 'synthetic_demo_data',
   review_status          text not null default 'approved' check (review_status in ('pending', 'approved', 'rejected')),
-  condition_tag          text  -- convenience column for demo filtering/seeding only
+  condition_tag          text,  -- convenience column for demo filtering/seeding only
+  success_rates          jsonb not null default '{}'::jsonb
 );
 
 create index if not exists idx_hospitals_city on hospitals (city);

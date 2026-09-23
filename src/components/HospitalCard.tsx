@@ -93,6 +93,7 @@ export function HospitalCard({
     lastVerified,
     sourceType,
     distance_km,
+    successRates,
   } = hospital;
 
   const mapUrl = latitude && longitude 
@@ -126,17 +127,38 @@ export function HospitalCard({
 
   if (activeFilters) {
     // 1) Disease / Specialty match
-    const searchedCondition = activeFilters.condition || activeFilters.specialty;
-    if (searchedCondition) {
-      const condLower = searchedCondition.toLowerCase();
-      const matched = specialties.find((s) => s.toLowerCase().includes(condLower));
-      if (matched) {
+    const searchCond = activeFilters.condition;
+    const searchSpec = activeFilters.specialty;
+    
+    if (searchCond || searchSpec) {
+      let matchedSpec = specialties.find((s) => 
+        (searchCond && s.toLowerCase().includes(searchCond.toLowerCase())) ||
+        (searchSpec && s.toLowerCase().includes(searchSpec.toLowerCase()))
+      );
+
+      // If we still don't have a match (e.g. searchSpec is a comma separated string), try to match parts
+      if (!matchedSpec && searchSpec) {
+         const specList = searchSpec.split(',').map(s => s.trim().toLowerCase());
+         matchedSpec = specialties.find(s => specList.some(ls => s.toLowerCase() === ls));
+      }
+
+      if (matchedSpec) {
         explainChips.push({
           icon: <Stethoscope className="w-3.5 h-3.5" />,
           label: "Specialty Match",
-          detail: `Has ${matched}`,
+          detail: `Has ${matchedSpec}`,
           color: "green",
         });
+
+        // Add success rate chip for the matched specialty
+        if (successRates && successRates[matchedSpec]) {
+          explainChips.push({
+            icon: <TrendingUp className="w-3.5 h-3.5" />,
+            label: "Success Rate",
+            detail: `${successRates[matchedSpec]}% in ${matchedSpec}`,
+            color: "purple",
+          });
+        }
       } else {
         // Partial / broad match
         explainChips.push({
@@ -145,6 +167,16 @@ export function HospitalCard({
           detail: `Offers ${matchingSpecialty}`,
           color: "slate",
         });
+        
+        // Show success rate for the matchingSpecialty if available
+        if (successRates && successRates[matchingSpecialty]) {
+          explainChips.push({
+            icon: <TrendingUp className="w-3.5 h-3.5" />,
+            label: "Success Rate",
+            detail: `${successRates[matchingSpecialty]}% in ${matchingSpecialty}`,
+            color: "purple",
+          });
+        }
       }
     }
 
@@ -274,6 +306,49 @@ export function HospitalCard({
         color: "slate",
       });
     });
+
+    // Show best available success rate even with no filters
+    if (successRates) {
+      const entries = Object.entries(successRates);
+      if (entries.length > 0) {
+        const [bestSpec, bestRate] = entries.reduce((best, curr) => curr[1] > best[1] ? curr : best);
+        explainChips.push({
+          icon: <TrendingUp className="w-3.5 h-3.5" />,
+          label: "Success Rate",
+          detail: `${bestRate}% in ${bestSpec}`,
+          color: "purple",
+        });
+      }
+    }
+  }
+
+  // ── Ensure a success rate chip is always shown if data is available ──────
+  // (handles cases where condition/specialty matched but successRates key didn't match exactly)
+  const hasSuccessChip = explainChips.some(c => c.label === "Success Rate");
+  if (!hasSuccessChip && successRates) {
+    // Try to find a rate for any of the hospital's specialties
+    const matchEntry = specialties
+      .map(s => [s, successRates[s]] as [string, number])
+      .find(([, rate]) => rate != null && rate > 0);
+    if (matchEntry) {
+      explainChips.push({
+        icon: <TrendingUp className="w-3.5 h-3.5" />,
+        label: "Success Rate",
+        detail: `${matchEntry[1]}% in ${matchEntry[0]}`,
+        color: "purple",
+      });
+    } else {
+      // Fallback: use any key in successRates
+      const anyEntry = Object.entries(successRates).find(([, v]) => v > 0);
+      if (anyEntry) {
+        explainChips.push({
+          icon: <TrendingUp className="w-3.5 h-3.5" />,
+          label: "Success Rate",
+          detail: `${anyEntry[1]}% in ${anyEntry[0]}`,
+          color: "purple",
+        });
+      }
+    }
   }
 
   /* ──────────────────────────────────────────────────────────────────────────
