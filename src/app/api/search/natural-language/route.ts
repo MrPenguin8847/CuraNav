@@ -139,7 +139,7 @@ async function callAimlApi(apiKey: string, query: string) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-5-5",
+          model: "gpt-4o",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -204,7 +204,7 @@ async function callOpenRouter(apiKey: string, query: string) {
           "X-Title": "CuraNav",
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o",
+          model: "qwen/qwen3.8-27b:free",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -269,7 +269,7 @@ async function callGroq(apiKey: string, query: string) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "mixtral-8x7b-32768",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -391,13 +391,21 @@ function localExtract(query: string) {
   let sort_by: string | null = null;
   let facilities: string[] = [];
 
-  if (q.includes("kidney") || q.includes("nephro") || q.includes("dialysis")) { condition = "kidney disease"; specialty = "Nephrology"; }
-  else if (q.includes("heart") || q.includes("cardiac") || q.includes("cardio")) { condition = "heart disease"; specialty = "Cardiology"; }
-  else if (q.includes("cancer") || q.includes("oncol") || q.includes("tumor")) { condition = "cancer"; specialty = "Oncology"; }
-  else if (q.includes("bone") || q.includes("joint") || q.includes("ortho")) { condition = "orthopaedic conditions"; specialty = "Orthopedics"; }
-  else if (q.includes("pregnan") || q.includes("matern")) { condition = "maternity"; specialty = "Obstetrics"; }
-  else if (q.includes("emergency") || q.includes("trauma")) { condition = "emergency care"; specialty = "Emergency Medicine"; }
-  else if (q.includes("neuro") || q.includes("brain")) { condition = "neurological conditions"; specialty = "Neurology"; }
+  if (q.includes("kidney") || q.includes("nephro") || q.includes("dialysis") || q.includes("renal")) { condition = "kidney disease"; specialty = "General Medicine"; }
+  else if (q.includes("heart") || q.includes("cardiac") || q.includes("cardio") || q.includes("bypass")) { condition = "heart disease"; specialty = "Cardiology"; }
+  else if (q.includes("cancer") || q.includes("oncol") || q.includes("tumor") || q.includes("chemo")) { condition = "cancer"; specialty = "General Surgery"; }
+  else if (q.includes("bone") || q.includes("joint") || q.includes("ortho") || q.includes("fracture") || q.includes("spine")) { condition = "orthopaedic conditions"; specialty = "Orthopaedics"; }
+  else if (q.includes("pregnan") || q.includes("matern") || q.includes("delivery") || q.includes("women") || q.includes("gynae") || q.includes("gyne")) { condition = "maternity"; specialty = "Obstetrics & Gynaecology"; }
+  else if (q.includes("emergency") || q.includes("trauma") || q.includes("accident")) { condition = "emergency care"; specialty = "Emergency Room Packages"; }
+  else if (q.includes("neuro") || q.includes("brain") || q.includes("stroke")) { condition = "neurological conditions"; specialty = "Neurosurgery"; }
+  else if (q.includes("burn")) { condition = "burns"; specialty = "Burns Management"; }
+  else if (q.includes("eye") || q.includes("cataract") || q.includes("vision") || q.includes("ophthal")) { condition = "eye care"; specialty = "Ophthalmology"; }
+  else if (q.includes("ear") || q.includes("nose") || q.includes("throat") || q.includes("ent") || q.includes("sinus")) { condition = "ENT conditions"; specialty = "Otorhinolaryngology (ENT)"; }
+  else if (q.includes("urin") || q.includes("urolog") || q.includes("prostate") || q.includes("bladder")) { condition = "urological conditions"; specialty = "Urology"; }
+  else if (q.includes("child") || q.includes("pediatr") || q.includes("paediatr") || q.includes("baby") || q.includes("infant") || q.includes("neonat")) { condition = "pediatric care"; specialty = "Paediatric Medical Management"; }
+  else if (q.includes("plastic") || q.includes("cosmetic") || q.includes("reconstruct")) { condition = "reconstructive surgery"; specialty = "Plastic & Reconstructive Surgery"; }
+  else if (q.includes("surgery") || q.includes("surgical") || q.includes("operation")) { condition = "surgical needs"; specialty = "General Surgery"; }
+  else if (q.includes("general") || q.includes("fever") || q.includes("check up") || q.includes("checkup")) { condition = "general care"; specialty = "General Medicine"; }
 
   const cities = ["chandigarh", "mohali", "delhi", "mumbai", "bangalore"];
   const foundCity = cities.find((c) => q.includes(c));
