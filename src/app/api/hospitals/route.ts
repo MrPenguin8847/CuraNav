@@ -64,54 +64,74 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  let query = supabaseAdmin.from("hospitals").select("*");
-
-  // Only show approved hospitals unless accessing as admin
-  if (!isAdmin) {
-    query = query.eq("review_status", "approved");
-  }
-
   const filtersApplied: Record<string, string | number | boolean | string[]> =
     {};
 
-  if (city) {
-    // If the destination is "India", return all hospitals by skipping the city filter
-    const lowerCity = city.trim().toLowerCase();
-    const isWholeCountry = lowerCity === "india" || lowerCity === "bharat";
+  // Reusable query builder so the relaxed radius fallback can re-apply the same
+  // specialty/condition/budget filters without the city-name text match.
+  const buildQuery = () => {
+    let q = supabaseAdmin.from("hospitals").select("*");
 
-    if (!isWholeCountry) {
-      // If radius is provided (or coords), we don't strictly filter by city name string match in DB,
-      // because we will filter by coordinates later. But we still record it.
-      if (!radiusKm && !latParam && !lonParam) {
-        // Smarter location matching: ignore stop words and match any significant word
-        const stopWords = ["in", "near", "at", "of", "the", "city", "village", "town", "district"];
-        const locationWords = city
-          .toLowerCase()
-          .split(/[\s,]+/)
-          .filter(w => w.length > 2 && !stopWords.includes(w));
+    // Only show approved hospitals unless accessing as admin
+    if (!isAdmin) {
+      q = q.eq("review_status", "approved");
+    }
 
-        if (locationWords.length > 0) {
-          const conditions = locationWords.flatMap(w => [
-            `city.ilike.%${w}%`, 
-            `state.ilike.%${w}%`, 
-            `address.ilike.%${w}%`
-          ]);
-          query = query.or(conditions.join(','));
-        } else {
-          // Fallback to exact match if only short words
-          query = query.or(`city.ilike.%${city.trim()}%,state.ilike.%${city.trim()}%,address.ilike.%${city.trim()}%`);
-        }
+    if (resolvedSpecialty && condition) {
+      const specs = resolvedSpecialty.split(',').map(s => `"${s.trim()}"`).join(',');
+      q = q.or(`specialties.ov.{${specs}},condition_tag.ilike.%${condition}%`);
+    } else if (resolvedSpecialty) {
+      const specs = resolvedSpecialty.split(',').map(s => s.trim()).filter(Boolean);
+      q = q.overlaps("specialties", specs);
+    } else if (condition) {
+      q = q.ilike("condition_tag", `%${condition}%`);
+    }
+
+    if (minBudget) {
+      let budget = parseInt(minBudget, 10);
+      const mStr = minBudget.toLowerCase();
+      if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
+        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
+      } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
+        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
+      }
+
+      if (!isNaN(budget)) {
+        q = q.gte("cost_max", budget);
+        filtersApplied.min_budget = budget;
       }
     }
-    filtersApplied.city = city;
-  }
 
-  // Fallback mapping for the mock dataset (which lacks 'condition_tag' and granular specialties like Nephrology)
+    if (maxBudget) {
+      let budget = parseInt(maxBudget, 10);
+      const mStr = maxBudget.toLowerCase();
+      if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
+        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
+      } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
+        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
+      }
+
+      if (!isNaN(budget)) {
+        // Also match PMJAY hospitals where cost is subsidized (often null cost_min)
+        q = q.or(`cost_min.lte.${budget},pmjay_empanelled.eq.true`);
+        filtersApplied.max_budget = budget;
+      }
+    }
+
+    if (verifiedOnly) {
+      q = q.eq("verification_status", "verified");
+      filtersApplied.verified_only = true;
+    }
+
+    return q;
+  };
+
+  // Fallback mapping so natural-language terms resolve to the hospital specialties in the dataset
   let resolvedSpecialty = specialty;
   const searchStr = `${specialty || ''} ${condition || ''} ${facilitiesParam || ''}`.toLowerCase();
 
   if (searchStr.includes("kidney") || searchStr.includes("renal") || searchStr.includes("nephro") || searchStr.includes("dialysis")) {
-    resolvedSpecialty = "General Medicine";
+    resolvedSpecialty = "General Medicine,Nephrology";
   } else if (searchStr.includes("heart") || searchStr.includes("cardio") || searchStr.includes("bypass")) {
     resolvedSpecialty = "Cardiology";
   } else if (searchStr.includes("cancer") || searchStr.includes("tumor") || searchStr.includes("oncol") || searchStr.includes("chemo")) {
@@ -142,49 +162,41 @@ export async function GET(req: NextRequest) {
     resolvedSpecialty = "General Medicine";
   }
 
-  if (resolvedSpecialty && condition) {
-    const specs = resolvedSpecialty.split(',').map(s => `"${s.trim()}"`).join(',');
-    query = query.or(`specialties.ov.{${specs}},condition_tag.ilike.%${condition}%`);
-    filtersApplied.specialty = resolvedSpecialty;
-    filtersApplied.condition = condition;
-  } else if (resolvedSpecialty) {
-    const specs = resolvedSpecialty.split(',').map(s => s.trim()).filter(Boolean);
-    query = query.overlaps("specialties", specs);
-    filtersApplied.specialty = resolvedSpecialty;
-  } else if (condition) {
-    query = query.ilike("condition_tag", `%${condition}%`);
-    filtersApplied.condition = condition;
+  let query = buildQuery();
+
+  if (city) {
+    // If the destination is "India", return all hospitals by skipping the city filter
+    const lowerCity = city.trim().toLowerCase();
+    const isWholeCountry = lowerCity === "india" || lowerCity === "bharat";
+
+    if (!isWholeCountry && !radiusKm && !latParam && !lonParam) {
+      // Smarter location matching: ignore stop words and match any significant word
+      const stopWords = ["in", "near", "at", "of", "the", "city", "village", "town", "district"];
+      const locationWords = city
+        .toLowerCase()
+        .split(/[\s,]+/)
+        .filter(w => w.length > 2 && !stopWords.includes(w));
+
+      if (locationWords.length > 0) {
+        const conditions = locationWords.flatMap(w => [
+          `city.ilike.%${w}%`,
+          `state.ilike.%${w}%`,
+          `address.ilike.%${w}%`
+        ]);
+        query = query.or(conditions.join(','));
+      } else {
+        // Fallback to exact match if only short words
+        query = query.or(`city.ilike.%${city.trim()}%,state.ilike.%${city.trim()}%,address.ilike.%${city.trim()}%`);
+      }
+    }
+    filtersApplied.city = city;
   }
 
-  if (minBudget) {
-    let budget = parseInt(minBudget, 10);
-    const mStr = minBudget.toLowerCase();
-    if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
-      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
-    } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
-      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
-    }
-    
-    if (!isNaN(budget)) {
-      query = query.gte("cost_max", budget);
-      filtersApplied.min_budget = budget;
-    }
+  if (resolvedSpecialty) {
+    filtersApplied.specialty = resolvedSpecialty;
   }
-
-  if (maxBudget) {
-    let budget = parseInt(maxBudget, 10);
-    const mStr = maxBudget.toLowerCase();
-    if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
-      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
-    } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
-      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
-    }
-
-    if (!isNaN(budget)) {
-      // Also match PMJAY hospitals where cost is subsidized (often null cost_min)
-      query = query.or(`cost_min.lte.${budget},pmjay_empanelled.eq.true`);
-      filtersApplied.max_budget = budget;
-    }
+  if (condition) {
+    filtersApplied.condition = condition;
   }
 
   if (facilitiesParam) {
@@ -197,11 +209,6 @@ export async function GET(req: NextRequest) {
       // query = query.contains("facilities", facilities);
       filtersApplied.facilities = facilities;
     }
-  }
-
-  if (verifiedOnly) {
-    query = query.eq("verification_status", "verified");
-    filtersApplied.verified_only = true;
   }
 
   // Default ordering: verification confidence first, then cost ascending
@@ -223,7 +230,7 @@ export async function GET(req: NextRequest) {
 
   // Handle geographical radius filtering in memory
   let coords: { lat: number; lon: number } | null = null;
-  let radius = radiusKm ? parseFloat(radiusKm) : 50; // default 50km radius for coord search
+  const radius = radiusKm ? parseFloat(radiusKm) : 50; // default 50km radius for coord search
 
   if (latParam && lonParam) {
     coords = { lat: parseFloat(latParam), lon: parseFloat(lonParam) };
@@ -244,52 +251,60 @@ export async function GET(req: NextRequest) {
     }).filter(h => h.distance_km !== undefined && h.distance_km <= radius);
   }
 
-  // ── Geocoding fallback ────────────────────────────────────────────────────
-  // If the city text filter returned 0 results AND we don't have coordinates,
-  // try to geocode the city name to get coordinates, then do a radius search
-  // against ALL approved hospitals.
-  if (hospitals.length === 0 && city && !coords) {
-    try {
-      const geocodeRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&countrycodes=in`,
-        { headers: { "User-Agent": "CuraNav/1.0 (https://curanav.vercel.app)" } }
-      );
-      if (geocodeRes.ok) {
-        const geocodeData = await geocodeRes.json();
-        if (Array.isArray(geocodeData) && geocodeData.length > 0) {
-          const geoLat = parseFloat(geocodeData[0].lat);
-          const geoLon = parseFloat(geocodeData[0].lon);
-          
-          if (!isNaN(geoLat) && !isNaN(geoLon)) {
-            coords = { lat: geoLat, lon: geoLon };
-            // Re-fetch ALL approved hospitals (no city text filter)
-            let retryQuery = supabaseAdmin.from("hospitals").select("*");
-            if (!isAdmin) {
-              retryQuery = retryQuery.eq("review_status", "approved");
-            }
-            retryQuery = retryQuery
-              .order("verification_status", { ascending: true })
-              .order("cost_min", { ascending: true });
-            
-            const { data: retryData } = await retryQuery;
-            if (retryData && retryData.length > 0) {
-              const geoRadius = radiusKm ? parseFloat(radiusKm) : 100; // wider 100km radius for geocoded fallback
-              hospitals = retryData.map(mapHospital).map(h => {
-                if (h.latitude && h.longitude) {
-                  const dist = haversine(geoLat, geoLon, h.latitude, h.longitude);
-                  return { ...h, distance_km: dist };
-                }
-                return h;
-              }).filter(h => h.distance_km !== undefined && h.distance_km <= geoRadius);
-              
-              filtersApplied.geocoded = true;
-              filtersApplied.radius_km = geoRadius;
+  // ── Relaxed radius fallback ──────────────────────────────────────────────
+  // When the strict search (city-name text match + specialty/budget filters)
+  // returns 0 results for a location-based query, re-search around the city
+  // coordinates WITHOUT the city-name text match but WITH the other filters.
+  // This surfaces nearby regional hospitals that actually match the condition
+  // (e.g. kidney hospitals in Ludhiana/Jalandhar for a Chandigarh search) and
+  // also covers cities already present in CITY_COORDS.
+  if (hospitals.length === 0 && city) {
+    if (!coords || Number.isNaN(coords.lat) || Number.isNaN(coords.lon)) {
+      try {
+        const geocodeRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&countrycodes=in`,
+          { headers: { "User-Agent": "CuraNav/1.0 (https://curanav.vercel.app)" } }
+        );
+        if (geocodeRes.ok) {
+          const geocodeData = await geocodeRes.json();
+          if (Array.isArray(geocodeData) && geocodeData.length > 0) {
+            const geoLat = parseFloat(geocodeData[0].lat);
+            const geoLon = parseFloat(geocodeData[0].lon);
+
+            if (!isNaN(geoLat) && !isNaN(geoLon)) {
+              coords = { lat: geoLat, lon: geoLon };
             }
           }
         }
+      } catch {
+        // Geocoding failed silently — return empty results
       }
-    } catch {
-      // Geocoding failed silently — return empty results
+    }
+
+    if (coords && !isNaN(coords.lat) && !isNaN(coords.lon)) {
+      // Wider regional radius so nearby district hospitals still appear
+      const geoRadius = radiusKm ? parseFloat(radiusKm) : 150;
+      if (!isNaN(geoRadius) && geoRadius > 0) {
+        const retryQuery = buildQuery()
+          .order("verification_status", { ascending: true })
+          .order("cost_min", { ascending: true });
+
+        const { data: retryData } = await retryQuery;
+        if (retryData && retryData.length > 0) {
+          hospitals = retryData.map(mapHospital).map(h => {
+            if (h.latitude && h.longitude) {
+              const dist = haversine(coords!.lat, coords!.lon, h.latitude, h.longitude);
+              return { ...h, distance_km: dist };
+            }
+            return h;
+          }).filter(h => h.distance_km !== undefined && h.distance_km <= geoRadius);
+
+          if (hospitals.length > 0) {
+            filtersApplied.geocoded = true;
+            filtersApplied.radius_km = geoRadius;
+          }
+        }
+      }
     }
   }
 
