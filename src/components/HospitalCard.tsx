@@ -56,11 +56,11 @@ interface HospitalCardProps {
  * ──────────────────────────────────────────────────────────────────────── */
 
 const CHIP_COLORS: Record<ExplainChip["color"], string> = {
-  green:  "bg-emerald-50 text-emerald-700 border-emerald-200",
-  blue:   "bg-sky-50 text-sky-700 border-sky-200",
-  amber:  "bg-amber-50 text-amber-700 border-amber-200",
-  purple: "bg-violet-50 text-violet-700 border-violet-200",
-  slate:  "bg-slate-50 text-slate-600 border-slate-200",
+  green:  "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+  blue:   "bg-sky-500/15 text-sky-300 border-sky-500/25",
+  amber:  "bg-amber-500/15 text-amber-300 border-amber-500/25",
+  purple: "bg-violet-500/15 text-violet-300 border-violet-500/25",
+  slate:  "bg-white/5 text-slate-300 border-white/10",
 };
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -397,15 +397,15 @@ export function HospitalCard({
             {accreditation.map((a) => (
               <span
                 key={a}
-                className="px-2 py-0.5 bg-background/50 text-muted-foreground text-xs font-semibold rounded-full border border-white/10"
+                className="px-2 py-0.5 bg-white/5 text-slate-300 text-xs font-semibold rounded-full border border-white/10"
               >
                 {a}
               </span>
             ))}
           </div>
           <h3 className="text-lg font-bold text-foreground leading-snug">{name}</h3>
-          <div className="flex items-center gap-1 mt-1 text-sm text-muted">
-            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+          <div className="flex items-center gap-1 mt-1 text-sm text-slate-300">
+            <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
             <span>{city ?? hospital.address ?? "India"}</span>
             {distance_km != null && (
               <span className="ml-1 text-xs text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded-md">
@@ -472,7 +472,7 @@ export function HospitalCard({
             <div className="flex-1">
               {costMin != null && costMax != null ? (
                 <>
-                  <p className="text-xs text-muted font-medium mb-0.5">Estimated Cost Range</p>
+                  <p className="text-xs text-slate-400 font-medium mb-0.5">Estimated Cost Range</p>
                   <p className="text-xl font-extrabold text-foreground tracking-tight">
                     {formatCost(costMin)} – {formatCost(costMax)}
                   </p>
@@ -482,13 +482,13 @@ export function HospitalCard({
                 </>
               ) : pmjayEmpanelled ? (
                 <div>
-                  <p className="text-xs text-muted font-medium mb-0.5">PM-JAY Beneficiary</p>
+                  <p className="text-xs text-slate-400 font-medium mb-0.5">PM-JAY Beneficiary</p>
                   <p className="text-base font-bold text-success leading-tight">Free / Subsidized Rates</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
                   <div>
-                    <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
+                    <p className="text-xs text-slate-400 font-medium mb-0.5">Pricing</p>
                     <p className="text-base font-semibold text-muted-foreground">Contact for pricing</p>
                   </div>
                   {estimatedAvgCost && (
@@ -528,15 +528,15 @@ export function HospitalCard({
       </div>
 
       {/* Annual volume — muted trust signal */}
-      <p className="text-xs text-muted mb-4">
+      <p className="text-xs text-slate-400 mb-4">
         {annualProcedureVolume != null
           ? `${annualProcedureVolume.toLocaleString("en-IN")} procedures/year · `
           : ""}Data source:{" "}
-        <span className="capitalize font-medium">{sourceType}</span>
+        <span className="capitalize font-medium text-slate-300">{sourceType}</span>
       </p>
 
       {/* ── DYNAMIC EXPLAINABILITY SECTION ── */}
-      <div className="border-t border-border pt-3 mb-4">
+      <div className="border-t border-white/10 pt-3 mb-4">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
           Why this result
         </p>
@@ -552,7 +552,7 @@ export function HospitalCard({
             </span>
           ))}
           {explainChips.length === 0 && (
-            <span className="text-xs text-muted italic">General result</span>
+            <span className="text-xs text-slate-400 italic">General result</span>
           )}
         </div>
       </div>

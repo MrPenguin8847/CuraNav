@@ -129,6 +129,19 @@ export function AurixScrollCanvas() {
       }
 
       ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+      
+      // Cover the baked-in Spline watermark in the bottom-right corner of the image
+      // The watermark is typically around 150x50 in the bottom right
+      const watermarkW = 160;
+      const watermarkH = 60;
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(
+        offsetX + drawW - watermarkW, 
+        offsetY + drawH - watermarkH, 
+        watermarkW, 
+        watermarkH
+      );
+
       lastDrawnFrame.current = frameIndex;
     }
   }, []);

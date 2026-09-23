@@ -5,10 +5,10 @@ export function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center text-center py-24 px-4">
       <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-5">
-        <SearchX className="w-8 h-8 text-muted" />
+        <SearchX className="w-8 h-8 text-slate-400" />
       </div>
       <h3 className="text-xl font-bold text-foreground mb-2">No hospitals found</h3>
-      <p className="text-sm text-muted max-w-sm mb-6">
+      <p className="text-sm text-slate-400 max-w-sm mb-6">
         We couldn&apos;t find hospitals matching your specific criteria. Try broadening your
         budget range, expanding the search radius, or removing a required facility.
       </p>

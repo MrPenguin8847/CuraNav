@@ -34,29 +34,29 @@ function renderMarkdown(md: string): string {
 
   let html = escaped
     // Headings — styled with colors and icons
-    .replace(/^#### (.+)$/gm, '<h4 style="font-size:0.85rem;font-weight:700;color:#334155;margin:1rem 0 0.5rem;padding-left:0.5rem;border-left:3px solid #6366f1">$1</h4>')
-    .replace(/^### (.+)$/gm, '<h3 style="font-size:0.95rem;font-weight:700;color:#1e293b;margin:1.25rem 0 0.5rem;padding:0.5rem 0.75rem;background:linear-gradient(135deg,#eef2ff,#f8fafc);border-radius:0.5rem;border-left:4px solid #6366f1">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 style="font-size:1.05rem;font-weight:800;color:#1e293b;margin:1.5rem 0 0.75rem;padding:0.6rem 0.75rem;background:linear-gradient(135deg,#e0e7ff,#eef2ff);border-radius:0.5rem;border-left:4px solid #4f46e5">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 style="font-size:1.15rem;font-weight:800;color:#1e293b;margin:0 0 0.75rem">$1</h1>')
+    .replace(/^#### (.+)$/gm, '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8;margin:1rem 0 0.5rem;padding-left:0.5rem;border-left:3px solid #6366f1">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:0.95rem;font-weight:700;color:#e2e8f0;margin:1.25rem 0 0.5rem;padding:0.5rem 0.75rem;background:rgba(99,102,241,0.1);border-radius:0.5rem;border-left:4px solid #6366f1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:1.05rem;font-weight:800;color:#f1f5f9;margin:1.5rem 0 0.75rem;padding:0.6rem 0.75rem;background:rgba(79,70,229,0.15);border-radius:0.5rem;border-left:4px solid #4f46e5">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="font-size:1.15rem;font-weight:800;color:#f1f5f9;margin:0 0 0.75rem">$1</h1>')
     // Bold and italic
-    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#1e293b;font-weight:700">$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em style="color:#475569">$1</em>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f1f5f9;font-weight:700">$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em style="color:#94a3b8">$1</em>')
     // Horizontal rules
-    .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e2e8f0;margin:1rem 0"/>')
+    .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:1rem 0"/>')
     // Unordered list items
-    .replace(/^- (.+)$/gm, '<li style="padding:0.3rem 0;font-size:0.85rem;color:#334155;line-height:1.6">$1</li>')
+    .replace(/^- (.+)$/gm, '<li style="padding:0.3rem 0;font-size:0.85rem;color:#cbd5e1;line-height:1.6">$1</li>')
     // Numbered list items  
-    .replace(/^\d+\.\s+(.+)$/gm, '<li style="padding:0.3rem 0;font-size:0.85rem;color:#334155;line-height:1.6;list-style-type:decimal">$1</li>')
+    .replace(/^\d+\.\s+(.+)$/gm, '<li style="padding:0.3rem 0;font-size:0.85rem;color:#cbd5e1;line-height:1.6;list-style-type:decimal">$1</li>')
     // Table rows
     .replace(/^\|(.+)\|$/gm, (_, row: string) => {
       const cells = row.split("|").map((c: string) => c.trim());
-      return "<tr>" + cells.map((c: string) => `<td style="padding:0.5rem 0.75rem;border-bottom:1px solid #e2e8f0;font-size:0.8rem;color:#334155">${c}</td>`).join("") + "</tr>";
+      return "<tr>" + cells.map((c: string) => `<td style="padding:0.5rem 0.75rem;border-bottom:1px solid rgba(255,255,255,0.07);font-size:0.8rem;color:#cbd5e1">${c}</td>`).join("") + "</tr>";
     })
     // Separator rows (|---|---|)
     .replace(/<tr><td[^>]*>[-:\s]+<\/td>.*?<\/tr>/g, "");
 
   // Wrap consecutive <li> in <ul>
-  html = html.replace(/((?:<li[^>]*>.*?<\/li>\s*)+)/g, '<ul style="list-style:none;padding:0;margin:0.5rem 0;background:#f8fafc;border-radius:0.5rem;padding:0.5rem 0.75rem;border:1px solid #e2e8f0">$1</ul>');
+  html = html.replace(/((?:<li[^>]*>.*?<\/li>\s*)+)/g, '<ul style="list-style:none;padding:0;margin:0.5rem 0;background:rgba(255,255,255,0.03);border-radius:0.5rem;padding:0.5rem 0.75rem;border:1px solid rgba(255,255,255,0.08)">$1</ul>');
 
   // Wrap consecutive <tr> in <table>
   html = html.replace(/((?:<tr>.*?<\/tr>\s*)+)/g, (match) => {
@@ -64,11 +64,11 @@ function renderMarkdown(md: string): string {
     const styled = match.replace(/<tr>(.*?)<\/tr>/, (m, inner) => {
       return '<thead><tr>' + inner.replace(/<td/g, '<th').replace(/<\/td>/g, '</th>') + '</tr></thead>';
     });
-    return `<div style="overflow-x:auto;border-radius:0.5rem;border:1px solid #e2e8f0;margin:0.75rem 0"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">${styled}</table></div>`;
+    return `<div style="overflow-x:auto;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin:0.75rem 0"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">${styled}</table></div>`;
   });
 
   // Style th elements
-  html = html.replace(/<th/g, '<th style="padding:0.6rem 0.75rem;background:#eef2ff;font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:#4f46e5;border-bottom:2px solid #c7d2fe;text-align:left"');
+  html = html.replace(/<th/g, '<th style="padding:0.6rem 0.75rem;background:rgba(99,102,241,0.15);font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:#a5b4fc;border-bottom:2px solid rgba(99,102,241,0.3);text-align:left"');
 
   // Convert remaining double newlines to paragraph breaks
   html = html.replace(/\n{2,}/g, "</p><p>");
@@ -85,7 +85,7 @@ function renderMarkdown(md: string): string {
   html = html.replace(/(\/>\s*)<\/p>/g, "$1");
 
   // Style paragraphs
-  html = html.replace(/<p>/g, '<p style="font-size:0.85rem;line-height:1.7;color:#475569;margin:0.5rem 0">');
+  html = html.replace(/<p>/g, '<p style="font-size:0.85rem;line-height:1.7;color:#94a3b8;margin:0.5rem 0">');
 
   return html;
 }
@@ -126,7 +126,7 @@ function TableRow({
 }) {
   return (
     <tr className="border-b border-border last:border-0">
-      <td className="py-3 pr-4 text-xs font-semibold text-muted uppercase tracking-wider align-top w-36 whitespace-nowrap">
+      <td className="py-3 pr-4 text-xs font-semibold text-slate-400 uppercase tracking-wider align-top w-36 whitespace-nowrap">
         {label}
       </td>
       {cells.map((cell, i) => (
@@ -134,7 +134,7 @@ function TableRow({
           key={i}
           className={`py-3 px-4 text-sm align-top ${
             i === highlightIdx ? "bg-success/8 rounded-lg" : ""
-          } ${muted ? "text-muted" : "text-foreground"}`}
+          } ${muted ? "text-slate-400" : "text-foreground"}`}
         >
           {cell}
         </td>
@@ -152,7 +152,7 @@ function FacilityCell({ has, facility }: { has: boolean; facility: string }) {
       {facility}
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 text-muted">
+    <span className="inline-flex items-center gap-1.5 text-slate-400">
       <Minus className="w-4 h-4 flex-shrink-0" />
       <span className="line-through opacity-50">{facility}</span>
     </span>
@@ -171,7 +171,7 @@ function EmptyCompare() {
         <h1 className="text-2xl font-bold text-foreground mb-2">
           Select hospitals to compare
         </h1>
-        <p className="text-sm text-muted max-w-sm mb-6">
+        <p className="text-sm text-slate-400 max-w-sm mb-6">
           Use the &ldquo;Add to Compare&rdquo; buttons on the results page to select
           2–3 hospitals, then click &ldquo;Compare Now&rdquo; to see them side by side.
         </p>
@@ -211,7 +211,7 @@ function MobileCard({
         <h3 className="text-base font-bold text-foreground leading-snug">
           {hospital.name}
         </h3>
-        <div className="flex items-center gap-1 mt-1 text-sm text-muted">
+        <div className="flex items-center gap-1 mt-1 text-sm text-slate-400">
           <MapPin className="w-3.5 h-3.5" />
           {hospital.city ?? hospital.address ?? "India"}
         </div>
@@ -267,7 +267,7 @@ function MobileCard({
 
       {/* Facilities */}
       <div>
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
           Facilities
         </p>
         <div className="flex flex-wrap gap-2">
@@ -319,7 +319,7 @@ function MetricRow({
 }) {
   return (
     <div className={`flex justify-between gap-4 py-2 border-b border-white/5 last:border-0 ${highlight ? "rounded-lg bg-success/8 px-2 -mx-2" : ""}`}>
-      <dt className="text-xs font-semibold text-muted uppercase tracking-wider flex-shrink-0 pt-0.5">
+      <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex-shrink-0 pt-0.5">
         {label}
         {highlight && note && (
           <span className="ml-1 text-success normal-case tracking-normal font-medium">
@@ -327,7 +327,7 @@ function MetricRow({
           </span>
         )}
       </dt>
-      <dd className={`text-sm text-right font-medium ${successColor ? "text-success" : muted ? "text-muted" : "text-foreground"}`}>
+      <dd className={`text-sm text-right font-medium ${successColor ? "text-success" : muted ? "text-slate-400" : "text-foreground"}`}>
         {value}
       </dd>
     </div>
@@ -406,7 +406,7 @@ function ComparePageInner() {
       <div className="min-h-screen flex flex-col bg-background font-sans">
         <Header />
         <main className="flex-grow flex items-center justify-center">
-          <p className="text-muted text-sm">Loading comparison…</p>
+          <p className="text-slate-400 text-sm">Loading comparison…</p>
         </main>
         <Footer />
       </div>
@@ -421,7 +421,7 @@ function ComparePageInner() {
         <main className="flex-grow flex items-center justify-center">
           <div className="card p-8 text-center space-y-3 max-w-sm">
             <p className="font-semibold text-foreground">Couldn&apos;t load hospitals</p>
-            <p className="text-sm text-muted">{error}</p>
+            <p className="text-sm text-slate-400">{error}</p>
             <Link href="/search" className="btn-primary inline-block">← Back to results</Link>
           </div>
         </main>
@@ -459,7 +459,7 @@ function ComparePageInner() {
         <div className="mb-6">
           <Link
             href="/search"
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-foreground transition-colors mb-3"
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-foreground transition-colors mb-3"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to results
@@ -487,7 +487,7 @@ function ComparePageInner() {
                 <Loader2 className="w-5 h-5 text-primary animate-spin" />
                 <div>
                   <p className="text-sm font-semibold text-foreground">AI is analyzing your hospitals…</p>
-                  <p className="text-xs text-muted">This may take a few seconds</p>
+                  <p className="text-xs text-slate-400">This may take a few seconds</p>
                 </div>
               </div>
             </div>
@@ -551,7 +551,7 @@ function ComparePageInner() {
               {/* Column headers */}
               <thead>
                 <tr className="border-b-2 border-border">
-                  <th className="text-left py-4 pr-4 pl-5 text-xs font-semibold text-muted uppercase tracking-wider w-36">
+                  <th className="text-left py-4 pr-4 pl-5 text-xs font-semibold text-slate-400 uppercase tracking-wider w-36">
                     Metric
                   </th>
                   {hospitals.map((h, i) => (
@@ -570,7 +570,7 @@ function ComparePageInner() {
                       <div className="font-bold text-foreground text-sm leading-snug mb-1">
                         {h.name}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-muted">
+                      <div className="flex items-center gap-1 text-xs text-slate-400">
                         <MapPin className="w-3 h-3" />
                         {h.city ?? h.address ?? "India"}
                       </div>
@@ -621,7 +621,7 @@ function ComparePageInner() {
                     <div key={i} className="space-y-1.5">
                       {/* Private Cost */}
                       <div>
-                        <span className="text-xs font-semibold text-muted uppercase tracking-wider block mb-0.5">Private</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Private</span>
                         {h.costMin != null && h.costMax != null ? (
                           <>
                             <p className={`font-bold ${i === costBest ? "text-success" : "text-foreground"}`}>
@@ -642,7 +642,7 @@ function ComparePageInner() {
                       {/* PM-JAY Cost */}
                       {h.pmjayEmpanelled && (
                         <div>
-                          <span className="text-xs font-semibold text-muted uppercase tracking-wider block mb-0.5">PM-JAY (Govt)</span>
+                          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">PM-JAY (Govt)</span>
                           <span className="inline-flex items-center gap-1 text-success font-semibold text-xs bg-success/10 px-2 py-0.5 rounded-full">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             Standard Rates (Free)
@@ -674,7 +674,7 @@ function ComparePageInner() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted text-xs">No specific accreditations listed</span>
+                        <span className="text-slate-400 text-xs">No specific accreditations listed</span>
                       )}
                     </div>
                   ))}
@@ -702,7 +702,7 @@ function ComparePageInner() {
                           📞 {h.phone}
                         </a>
                       ) : (
-                        <span className="text-muted text-sm">Not available</span>
+                        <span className="text-slate-400 text-sm">Not available</span>
                       )}
                     </span>
                   ))}
@@ -718,7 +718,7 @@ function ComparePageInner() {
                           {s}
                         </span>
                       )) : (
-                        <span className="text-muted text-xs">Not listed</span>
+                        <span className="text-slate-400 text-xs">Not listed</span>
                       )}
                     </div>
                   ))}
@@ -744,7 +744,7 @@ function ComparePageInner() {
                         Empanelled
                       </span>
                     ) : (
-                      <span key={h.hospitalId} className="text-muted text-xs">Not empanelled</span>
+                      <span key={h.hospitalId} className="text-slate-400 text-xs">Not empanelled</span>
                     )
                   )}
                 />
@@ -798,7 +798,7 @@ function ComparePageInner() {
         <div className="md:hidden space-y-6">
           {hospitals.map((h, i) => (
             <div key={h.hospitalId}>
-              <p className="text-xs font-bold text-muted uppercase tracking-wider mb-2">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                 Hospital {i + 1} of {n}
               </p>
               <MobileCard
@@ -826,7 +826,7 @@ export default function ComparePage() {
       <div className="min-h-screen flex flex-col bg-background font-sans">
         <Header />
         <main className="flex-grow flex items-center justify-center">
-          <p className="text-muted text-sm">Loading comparison…</p>
+          <p className="text-slate-400 text-sm">Loading comparison…</p>
         </main>
         <Footer />
       </div>

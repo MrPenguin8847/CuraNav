@@ -308,7 +308,7 @@ function SearchResultsInner() {
         {/* Back to search */}
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-foreground transition-colors mb-6"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to search
@@ -330,7 +330,7 @@ function SearchResultsInner() {
         {!isLoading && !error && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
-              <ListFilter className="w-4 h-4 text-muted" />
+              <ListFilter className="w-4 h-4 text-slate-400" />
               <p className="text-sm font-semibold text-foreground">
                 {resultCount} hospital{resultCount !== 1 ? "s" : ""} match your search
               </p>
@@ -338,8 +338,8 @@ function SearchResultsInner() {
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-muted" />
-                <label htmlFor="sort-select" className="text-xs font-medium text-muted">
+                <SlidersHorizontal className="w-4 h-4 text-slate-400" />
+                <label htmlFor="sort-select" className="text-xs font-medium text-slate-400">
                   Sort by:
                 </label>
               </div>
@@ -373,7 +373,7 @@ function SearchResultsInner() {
         ) : error ? (
           <div className="card p-8 text-center space-y-4">
             <p className="text-foreground font-semibold">Something went wrong loading results.</p>
-            <p className="text-sm text-muted">{error}</p>
+            <p className="text-sm text-slate-400">{error}</p>
             <button onClick={fetchHospitals} className="btn-primary">
               Retry
             </button>

@@ -67,54 +67,9 @@ export function AurixHudOverlay({ progress, loadedPercent }: Props) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div
           style={{
-            background: "rgba(255,255,255,0.08)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: "9999px",
-            padding: "0.5rem 1rem",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.75rem",
+            display: "none"
           }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#60a5fa",
-              animation: "pulse 2s ease-in-out infinite",
-            }}
-          />
-          <span
-            style={{
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase" as const,
-              color: "rgba(191,219,254,0.9)",
-            }}
-          >
-            Aurix 3D Engine
-          </span>
-          <span
-            style={{
-              width: 1,
-              height: 16,
-              background: "rgba(255,255,255,0.2)",
-            }}
-          />
-          <span
-            style={{
-              fontSize: "0.7rem",
-              fontFamily: "monospace",
-              color: "rgba(255,255,255,0.5)",
-            }}
-          >
-            {loadedPercent < 100 ? `Loading ${loadedPercent}%` : "Ready"}
-          </span>
-        </div>
+        ></div>
 
         {/* Phase indicator dots */}
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>

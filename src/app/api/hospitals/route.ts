@@ -157,7 +157,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (minBudget) {
-    const budget = parseInt(minBudget, 10);
+    let budget = parseInt(minBudget, 10);
+    const mStr = minBudget.toLowerCase();
+    if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
+      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
+    } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
+      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
+    }
+    
     if (!isNaN(budget)) {
       query = query.gte("cost_max", budget);
       filtersApplied.min_budget = budget;
@@ -165,9 +172,17 @@ export async function GET(req: NextRequest) {
   }
 
   if (maxBudget) {
-    const budget = parseInt(maxBudget, 10);
+    let budget = parseInt(maxBudget, 10);
+    const mStr = maxBudget.toLowerCase();
+    if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
+      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
+    } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
+      budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
+    }
+
     if (!isNaN(budget)) {
-      query = query.lte("cost_min", budget);
+      // Also match PMJAY hospitals where cost is subsidized (often null cost_min)
+      query = query.or(`cost_min.lte.${budget},pmjay_empanelled.eq.true`);
       filtersApplied.max_budget = budget;
     }
   }
