@@ -347,10 +347,10 @@ function SearchResultsInner() {
                 id="sort-select"
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortKey)}
-                className="text-sm font-semibold text-foreground bg-white border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="text-sm font-semibold text-foreground glass bg-background/50 border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
-                  <option key={key} value={key}>
+                  <option key={key} value={key} className="bg-background text-foreground">
                     {SORT_LABELS[key]}
                   </option>
                 ))}
@@ -399,13 +399,13 @@ function SearchResultsInner() {
         {/* ── LOCATION PROMPT MODAL ── */}
         {showLocationPrompt && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center space-y-6 animate-fade-in">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <div className="glass bg-background/90 border border-white/10 rounded-2xl shadow-2xl shadow-black/50 max-w-md w-full p-8 text-center space-y-6 animate-fade-in">
+              <div className="w-16 h-16 rounded-full glass flex items-center justify-center mx-auto">
                 <MapPin className="w-8 h-8 text-primary" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-foreground mb-2">Enable Location</h2>
-                <p className="text-muted text-sm">
+                <p className="text-muted-foreground text-sm">
                   Your search includes <span className="font-semibold text-foreground">"near me"</span>. To show hospitals closest to you, we need your location.
                 </p>
               </div>
@@ -423,7 +423,7 @@ function SearchResultsInner() {
                 </button>
                 <button
                   onClick={continueWithoutLocation}
-                  className="w-full px-6 py-3 text-muted font-medium rounded-xl border border-border hover:bg-slate-50 transition-colors text-sm"
+                  className="w-full px-6 py-3 text-muted-foreground font-medium rounded-xl border border-white/10 hover:bg-white/5 transition-colors text-sm"
                 >
                   Skip — show all results instead
                 </button>

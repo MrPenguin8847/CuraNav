@@ -23,15 +23,15 @@ export function AdvancedFilters() {
       </button>
 
       {isOpen && (
-        <div className="mt-4 p-6 bg-white rounded-2xl shadow-sm border border-border animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="mt-4 p-6 glass bg-background/50 rounded-2xl shadow-sm border border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             {/* Specialty / Condition */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Specialty / Condition</label>
+              <label className="block text-sm font-medium text-muted-foreground">Specialty / Condition</label>
               <select 
                 name="specialty" 
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none"
+                className="w-full px-4 py-2 bg-background/80 border border-white/10 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none"
               >
                 <option value="">Any Specialty</option>
                 <option value="cardiology">Cardiology</option>
@@ -44,18 +44,18 @@ export function AdvancedFilters() {
 
             {/* Location */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Location</label>
+              <label className="block text-sm font-medium text-muted-foreground">Location</label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input 
                   type="text" 
                   name="location" 
                   placeholder="Enter city or pin code" 
-                  className="w-full pl-9 pr-24 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full pl-9 pr-24 py-2 bg-background/80 border border-white/10 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50"
                 />
                 <button 
                   type="button"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-1 bg-slate-200 hover:bg-slate-300 text-xs font-medium text-slate-700 rounded transition-colors"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-1 bg-white/10 hover:bg-white/20 text-xs font-medium text-foreground rounded transition-colors"
                 >
                   Use my location
                 </button>
@@ -64,25 +64,25 @@ export function AdvancedFilters() {
 
             {/* Budget */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Budget Range</label>
+              <label className="block text-sm font-medium text-muted-foreground">Budget Range</label>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                   <input 
                     type="number" 
                     name="minBudget" 
                     placeholder="Min" 
-                    className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="w-full pl-7 pr-3 py-2 bg-background/80 border border-white/10 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50"
                   />
                 </div>
-                <span className="text-slate-400">-</span>
+                <span className="text-muted-foreground">-</span>
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                   <input 
                     type="number" 
                     name="maxBudget" 
                     placeholder="Max" 
-                    className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="w-full pl-7 pr-3 py-2 bg-background/80 border border-white/10 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50"
                   />
                 </div>
               </div>
@@ -90,10 +90,10 @@ export function AdvancedFilters() {
             
             {/* Sort Priority */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Sort Priority</label>
+              <label className="block text-sm font-medium text-muted-foreground">Sort Priority</label>
               <select 
                 name="sort" 
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none"
+                className="w-full px-4 py-2 bg-background/80 border border-white/10 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none"
               >
                 <option value="match">Best Match</option>
                 <option value="cost">Lowest Cost</option>
@@ -103,11 +103,11 @@ export function AdvancedFilters() {
 
             {/* Facilities */}
             <div className="space-y-2 lg:col-span-2">
-              <label className="block text-sm font-medium text-slate-700">Required Facilities</label>
+              <label className="block text-sm font-medium text-muted-foreground">Required Facilities</label>
               <div className="flex flex-wrap gap-2">
                 {facilities.map(facility => (
-                  <label key={facility} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input type="checkbox" name="facilities" value={facility} className="rounded text-primary focus:ring-primary/20 border-slate-300 w-3.5 h-3.5" />
+                  <label key={facility} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-background/50 border border-white/10 rounded-full text-xs font-medium text-muted-foreground cursor-pointer hover:bg-white/5 transition-colors">
+                    <input type="checkbox" name="facilities" value={facility} className="rounded text-primary focus:ring-primary/20 border-white/10 w-3.5 h-3.5" />
                     {facility}
                   </label>
                 ))}

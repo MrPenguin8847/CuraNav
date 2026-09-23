@@ -165,8 +165,8 @@ function EmptyCompare() {
     <div className="min-h-screen flex flex-col bg-background font-sans">
       <Header />
       <main className="flex-grow flex flex-col items-center justify-center px-4 py-24 text-center">
-        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-5">
-          <GitCompare className="w-8 h-8 text-muted" />
+        <div className="w-16 h-16 rounded-full bg-background/50 border border-white/10 flex items-center justify-center mb-5">
+          <GitCompare className="w-8 h-8 text-muted-foreground" />
         </div>
         <h1 className="text-2xl font-bold text-foreground mb-2">
           Select hospitals to compare
@@ -280,7 +280,7 @@ function MobileCard({
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
                   has
                     ? "bg-success/10 text-success border-success/20"
-                    : "bg-slate-50 text-slate-300 border-slate-200"
+                    : "bg-background text-muted-foreground border-white/10"
                 }`}
               >
                 <Icon className="w-3 h-3" />
@@ -318,7 +318,7 @@ function MetricRow({
   successColor?: boolean;
 }) {
   return (
-    <div className={`flex justify-between gap-4 py-2 border-b border-slate-50 last:border-0 ${highlight ? "rounded-lg bg-success/8 px-2 -mx-2" : ""}`}>
+    <div className={`flex justify-between gap-4 py-2 border-b border-white/5 last:border-0 ${highlight ? "rounded-lg bg-success/8 px-2 -mx-2" : ""}`}>
       <dt className="text-xs font-semibold text-muted uppercase tracking-wider flex-shrink-0 pt-0.5">
         {label}
         {highlight && note && (
@@ -526,7 +526,7 @@ function ComparePageInner() {
                 </button>
               </div>
               {/* Body */}
-              <div className="bg-white px-6 py-5">
+              <div className="bg-background/50 px-6 py-5">
                 <div
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(aiSummary) }}
                 />
@@ -536,8 +536,8 @@ function ComparePageInner() {
         </div>
 
         {/* Disclaimer caption */}
-        <p className="text-xs text-muted mb-6 max-w-2xl bg-white border border-border rounded-xl px-4 py-3">
-          <strong className="text-slate-600">Note:</strong> Highlighted values
+        <p className="text-xs text-muted-foreground mb-6 max-w-2xl bg-background/50 border border-white/10 rounded-xl px-4 py-3">
+          <strong className="text-foreground">Note:</strong> Highlighted values
           show the strongest option for that specific metric — not an overall
           recommendation. Review all factors together before making a decision.
           Cost figures are indicative; procedure volumes are reported data and
@@ -667,7 +667,7 @@ function ComparePageInner() {
                           {h.accreditation.map((a) => (
                             <span
                               key={a}
-                              className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full border border-slate-200"
+                              className="px-2 py-0.5 bg-background/50 text-muted-foreground text-xs font-semibold rounded-full border border-white/10"
                             >
                               {a}
                             </span>

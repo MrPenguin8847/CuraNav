@@ -93,89 +93,89 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm mb-6 overflow-hidden">
+    <div className="glass bg-background/50 rounded-2xl border border-white/10 shadow-sm mb-6 overflow-hidden">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+        className="w-full flex items-center justify-between p-4 bg-background hover:bg-white/5 transition-colors"
       >
         <div className="flex items-center gap-2 text-foreground font-semibold">
           <Filter className="w-5 h-5 text-primary" />
           Manual Filter
         </div>
-        <span className="text-sm font-medium text-muted">
+        <span className="text-sm font-medium text-muted-foreground">
           {isOpen ? "Hide" : "Show"} options
         </span>
       </button>
 
       {isOpen && (
-        <form onSubmit={handleApply} className="p-4 md:p-6 border-t border-border space-y-6">
+        <form onSubmit={handleApply} className="p-4 md:p-6 border-t border-white/10 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">City</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">City</label>
               <input 
                 type="text" 
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="e.g. Chandigarh"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                className="w-full px-4 py-2.5 bg-background/80 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
               />
             </div>
             
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Disease / Condition</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Disease / Condition</label>
               <input 
                 type="text" 
                 value={condition}
                 onChange={(e) => setCondition(e.target.value)}
                 placeholder="e.g. Heart attack"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                className="w-full px-4 py-2.5 bg-background/80 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Specialty</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Specialty</label>
               <input 
                 type="text" 
                 value={specialty}
                 onChange={(e) => setSpecialty(e.target.value)}
                 placeholder="e.g. Cardiology"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                className="w-full px-4 py-2.5 bg-background/80 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Radius (km)</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Radius (km)</label>
               <input 
                 type="number" 
                 value={radiusKm}
                 onChange={(e) => setRadiusKm(e.target.value)}
                 placeholder="e.g. 20"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                className="w-full px-4 py-2.5 bg-background/80 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
               />
             </div>
             
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Budget Range (₹)</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Budget Range (₹)</label>
               <div className="flex gap-2">
                 <input 
                   type="number" 
                   value={minBudget}
                   onChange={(e) => setMinBudget(e.target.value)}
                   placeholder="Min"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                  className="w-full px-4 py-2.5 bg-background/80 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
                 />
                 <input 
                   type="number" 
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
                   placeholder="Max"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                  className="w-full px-4 py-2.5 bg-background/80 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
                 />
               </div>
               {suggestedCost && (
-                <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded flex items-start gap-1.5">
-                  <Info className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-blue-800 leading-tight">
+                <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-400 leading-tight">
                     Estimated avg: <strong>₹{suggestedCost.min.toLocaleString('en-IN')} - ₹{suggestedCost.max.toLocaleString('en-IN')}</strong> for {specialty}.
                   </p>
                 </div>
@@ -184,7 +184,7 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
           </div>
 
           <div className="space-y-2">
-             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Required Facilities</label>
+             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Required Facilities</label>
              <div className="flex flex-wrap gap-2">
                 {Object.keys(facilities).map((fac) => (
                   <label
@@ -192,7 +192,7 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
                     className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${
                       facilities[fac as keyof typeof facilities]
                         ? "bg-primary/10 border-primary text-primary font-semibold"
-                        : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        : "bg-background/50 border-white/10 text-muted-foreground hover:border-white/20 hover:bg-white/5"
                     }`}
                   >
                     <input
@@ -207,11 +207,11 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
              </div>
           </div>
 
-          <div className="flex gap-3 justify-end border-t border-slate-100 pt-4">
+          <div className="flex gap-3 justify-end border-t border-white/10 pt-4">
             <button 
               type="button"
               onClick={handleClear}
-              className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors"
+              className="px-5 py-2.5 border border-white/10 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-white/5 transition-colors"
             >
               Clear Filters
             </button>

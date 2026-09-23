@@ -86,13 +86,13 @@ function HospitalNotFound({ id }: { id: string }) {
     <div className="min-h-screen flex flex-col bg-background font-sans">
       <Header />
       <main className="flex-grow flex flex-col items-center justify-center px-4 py-24 text-center">
-        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-5">
-          <SearchX className="w-8 h-8 text-muted" />
+        <div className="w-16 h-16 rounded-full bg-background/50 border border-white/10 flex items-center justify-center mb-5">
+          <SearchX className="w-8 h-8 text-muted-foreground" />
         </div>
         <h1 className="text-2xl font-bold text-foreground mb-2">Hospital not found</h1>
-        <p className="text-sm text-muted max-w-sm mb-6">
+        <p className="text-sm text-muted-foreground max-w-sm mb-6">
           We couldn&apos;t find a hospital with ID{" "}
-          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs font-mono">
+          <code className="bg-background/80 px-1.5 py-0.5 rounded text-xs font-mono">
             {id}
           </code>
           . It may have been removed or the link may be incorrect.
@@ -185,7 +185,7 @@ export default async function HospitalDetailPage({
             {accreditation.map((a) => (
               <span
                 key={a}
-                className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full border border-slate-200"
+                className="px-2.5 py-1 bg-background/50 text-muted-foreground text-xs font-semibold rounded-full border border-white/10"
               >
                 {a}
               </span>
@@ -317,7 +317,7 @@ export default async function HospitalDetailPage({
               return (
                 <span
                   key={f}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-full text-xs font-medium text-slate-600 shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 glass bg-background/50 border border-white/10 rounded-full text-xs font-medium text-muted-foreground shadow-sm"
                 >
                   <Icon className="w-3.5 h-3.5 text-primary" />
                   {f}
@@ -326,7 +326,7 @@ export default async function HospitalDetailPage({
             })}
           </div>
           {icuBeds > 0 && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-background/50 border border-white/10 rounded-xl text-sm">
               <BedDouble className="w-4 h-4 text-primary" />
               <span className="font-semibold text-foreground">{icuBeds}</span>
               <span className="text-muted">ICU beds (indicative)</span>
@@ -339,7 +339,7 @@ export default async function HospitalDetailPage({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             {/* Average Costs */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="p-4 bg-background/50 rounded-xl border border-white/10 flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-2">
                 <IndianRupee className="w-4 h-4 text-primary" />
                 <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Average Cost</h3>
@@ -368,7 +368,7 @@ export default async function HospitalDetailPage({
             </div>
 
             {/* Patient Volumes */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="p-4 bg-background/50 rounded-xl border border-white/10 flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-2">
                 <Activity className="w-4 h-4 text-primary" />
                 <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Patient Volumes</h3>
@@ -380,7 +380,7 @@ export default async function HospitalDetailPage({
             </div>
 
             {/* Outcomes */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="p-4 bg-background/50 rounded-xl border border-white/10 flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
                 <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Reported Outcomes</h3>
@@ -391,7 +391,7 @@ export default async function HospitalDetailPage({
             </div>
 
             {/* Verified Certifications */}
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="p-4 bg-background/50 rounded-xl border border-white/10 flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-2">
                 <Award className="w-4 h-4 text-primary" />
                 <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Certifications</h3>
@@ -401,7 +401,7 @@ export default async function HospitalDetailPage({
                 {accreditation.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {accreditation.map((a) => (
-                      <span key={a} className="px-2 py-0.5 bg-white text-slate-600 text-xs font-semibold rounded-full border border-slate-200">
+                      <span key={a} className="px-2 py-0.5 bg-background/50 text-muted-foreground text-xs font-semibold rounded-full border border-white/10">
                         {a}
                       </span>
                     ))}
@@ -456,7 +456,7 @@ export default async function HospitalDetailPage({
             <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-xs font-bold text-warning uppercase tracking-wider mb-1">Limitations</p>
-              <p className="text-sm text-slate-700 leading-relaxed">
+              <p className="text-sm text-warning/80 leading-relaxed">
                 This record is provided for demonstration. Some or all statistics may be simulated. Verify cost,
                 availability, and treatment suitability directly with the hospital before making any clinical or
                 financial decisions.

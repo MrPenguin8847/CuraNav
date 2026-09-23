@@ -68,17 +68,17 @@ export function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="glass bg-background/90 rounded-2xl w-full max-w-3xl shadow-xl flex flex-col max-h-[90vh] border border-white/10">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div>
             <h2 className="text-xl font-bold text-foreground">Upload CSV</h2>
-            <p className="text-sm text-muted mt-1">Import multiple hospitals at once.</p>
+            <p className="text-sm text-muted-foreground mt-1">Import multiple hospitals at once.</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
+            className="p-2 hover:bg-white/10 rounded-full text-muted-foreground transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -87,10 +87,10 @@ export function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalPro
         {/* Body */}
         <div className="p-6 overflow-y-auto">
           {!file ? (
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50/50">
-              <UploadCloud className="w-10 h-10 text-slate-400 mb-4" />
+            <div className="border-2 border-dashed border-white/10 rounded-xl p-8 flex flex-col items-center justify-center bg-background/50">
+              <UploadCloud className="w-10 h-10 text-muted-foreground mb-4" />
               <p className="text-sm text-foreground font-medium mb-1">Click to upload or drag and drop</p>
-              <p className="text-xs text-muted mb-4">CSV files only</p>
+              <p className="text-xs text-muted-foreground mb-4">CSV files only</p>
               <label className="btn-primary cursor-pointer">
                 Select File
                 <input type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
@@ -98,19 +98,19 @@ export function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalPro
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between p-4 bg-background/50 border border-white/10 rounded-xl">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                  <div className="p-2 bg-primary/10 text-primary rounded-lg">
                     <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">{file.name}</p>
-                    <p className="text-xs text-muted">{parsedData.length} rows found</p>
+                    <p className="text-xs text-muted-foreground">{parsedData.length} rows found</p>
                   </div>
                 </div>
                 <button
                   onClick={() => { setFile(null); setParsedData([]); setError(null); }}
-                  className="text-sm font-medium text-slate-500 hover:text-foreground underline"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground underline"
                 >
                   Change file
                 </button>
@@ -119,9 +119,9 @@ export function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalPro
               {parsedData.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold mb-2">Preview (first 3 rows)</h3>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <div className="overflow-x-auto rounded-lg border border-white/10">
                     <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-50 border-b border-slate-200 uppercase text-slate-500">
+                      <thead className="bg-background/80 border-b border-white/10 uppercase text-muted-foreground">
                         <tr>
                           {Object.keys(parsedData[0]).slice(0, 5).map((key) => (
                             <th key={key} className="px-4 py-2 font-medium">{key}</th>
@@ -129,13 +129,13 @@ export function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalPro
                           {Object.keys(parsedData[0]).length > 5 && <th className="px-4 py-2 font-medium">...</th>}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-white/5">
                         {parsedData.slice(0, 3).map((row, i) => (
-                          <tr key={i} className="hover:bg-slate-50">
+                          <tr key={i} className="hover:bg-white/5">
                             {Object.values(row).slice(0, 5).map((val: any, j) => (
-                              <td key={j} className="px-4 py-2 truncate max-w-[150px]">{String(val)}</td>
+                              <td key={j} className="px-4 py-2 truncate max-w-[150px] text-foreground">{String(val)}</td>
                             ))}
-                            {Object.values(row).length > 5 && <td className="px-4 py-2 text-slate-400">...</td>}
+                            {Object.values(row).length > 5 && <td className="px-4 py-2 text-muted-foreground">...</td>}
                           </tr>
                         ))}
                       </tbody>
@@ -147,7 +147,7 @@ export function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalPro
           )}
 
           {error && (
-            <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-xl flex items-start gap-3 text-sm border border-red-100">
+            <div className="mt-4 p-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl flex items-start gap-3 text-sm">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
               <p>{error}</p>
             </div>
@@ -155,10 +155,10 @@ export function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalPro
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 mt-auto">
+        <div className="p-6 border-t border-white/10 bg-background/80 flex justify-end gap-3 mt-auto">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200/50 rounded-xl transition-colors text-sm"
+            className="px-4 py-2 text-muted-foreground font-medium hover:bg-white/10 rounded-xl transition-colors text-sm"
           >
             Cancel
           </button>

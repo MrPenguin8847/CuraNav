@@ -124,7 +124,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
+    <div className="min-h-screen flex flex-col bg-background font-sans">
       <Header />
 
       <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
@@ -133,7 +133,7 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
               Admin Dashboard
             </h1>
-            <p className="text-slate-500 mt-2">
+            <p className="text-muted-foreground mt-2">
               Review and curate hospital records before they appear in public search results.
             </p>
           </div>
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={handleSignOut}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 glass bg-background/50 border border-white/10 text-muted-foreground hover:bg-white/5 rounded-xl font-medium transition-colors text-sm shadow-sm"
             >
               <LogOut className="w-4 h-4" />
               Sign out
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
                 className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${
                   filter === tab
                     ? "bg-primary text-white"
-                    : "bg-white text-slate-600 border border-slate-200 hover:border-primary/50"
+                    : "bg-background/50 text-muted-foreground border border-white/10 hover:border-primary/50"
                 }`}
               >
                 {tab}
@@ -190,9 +190,9 @@ export default function AdminDashboard() {
               placeholder="Search hospitals..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full pl-10 pr-4 py-2 bg-background/50 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground/50"
             />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
           </div>
@@ -200,12 +200,12 @@ export default function AdminDashboard() {
 
         {/* Content */}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted">
-            <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin mb-4" />
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <div className="w-8 h-8 border-4 border-white/10 border-t-primary rounded-full animate-spin mb-4" />
             <p>Loading records...</p>
           </div>
         ) : error ? (
-          <div className="p-6 bg-red-50 text-red-600 rounded-xl flex items-center gap-3">
+          <div className="p-6 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl flex items-center gap-3">
             <AlertCircle className="w-5 h-5" />
             <span>{error}</span>
             <button onClick={fetchHospitals} className="ml-auto underline font-semibold">
@@ -213,15 +213,15 @@ export default function AdminDashboard() {
             </button>
           </div>
         ) : filteredHospitals.length === 0 ? (
-          <div className="text-center py-24 bg-white rounded-2xl border border-slate-200">
-            <Database className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">No records found for this filter.</p>
+          <div className="text-center py-24 glass bg-background/50 rounded-2xl border border-white/10">
+            <Database className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">No records found for this filter.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="glass bg-background/50 rounded-2xl border border-white/10 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase text-xs font-semibold tracking-wider">
+                <thead className="bg-background/80 border-b border-white/10 text-muted-foreground uppercase text-xs font-semibold tracking-wider">
                   <tr>
                     <th className="px-6 py-4">Hospital Name</th>
                     <th className="px-6 py-4">Location</th>
@@ -231,22 +231,22 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-white/5">
                   {filteredHospitals.map((hospital) => (
-                    <tr key={hospital.hospitalId} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={hospital.hospitalId} className="hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
                       <td className="px-6 py-4">
                         <div className="font-bold text-foreground">
                           {hospital.name}
                         </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          ID: <span className="font-mono bg-slate-100 px-1 py-0.5 rounded">{hospital.hospitalId}</span>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          ID: <span className="font-mono bg-background/80 border border-white/10 px-1 py-0.5 rounded">{hospital.hospitalId}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-600">
+                      <td className="px-6 py-4 text-muted-foreground">
                         {hospital.city}, {hospital.state}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 capitalize">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-background/50 text-muted-foreground border border-white/10 capitalize">
                           <FileText className="w-3 h-3" />
                           {hospital.sourceType}
                         </span>
@@ -343,7 +343,7 @@ function StatusBadge({ status }: { status: ReviewStatus }) {
   }
   if (status === "rejected") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
         <X className="w-3.5 h-3.5" />
         Rejected
       </span>

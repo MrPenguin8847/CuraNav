@@ -24,7 +24,7 @@ export function ExplainabilityPanel({ onEditSearch, explanation }: Explainabilit
           <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">
             We understood your request as:
           </p>
-          <p className="text-sm text-slate-600 italic">
+          <p className="text-sm text-muted-foreground italic">
             &ldquo;{query}&rdquo;
           </p>
         </div>
@@ -41,10 +41,10 @@ export function ExplainabilityPanel({ onEditSearch, explanation }: Explainabilit
         {chips.map(({ icon, label, value }) => (
           <div
             key={label}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-primary/20 rounded-full shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 glass bg-background/50 border border-primary/20 rounded-full shadow-sm"
           >
             <span className="text-sm leading-none">{icon}</span>
-            <span className="text-xs text-muted font-medium">{label}:</span>
+            <span className="text-xs text-muted-foreground font-medium">{label}:</span>
             <span className="text-xs font-semibold text-foreground">{value}</span>
           </div>
         ))}
