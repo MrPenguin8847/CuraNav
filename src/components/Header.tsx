@@ -8,7 +8,7 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-100">
+    <header className="glass sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
@@ -27,16 +27,16 @@ export function Header() {
           <Link href="/" className="text-sm font-medium text-primary relative after:absolute after:bottom-[-4px] after:left-0 after:w-full after:h-0.5 after:bg-primary after:rounded-full">
             Home
           </Link>
-          <Link href="/find-hospital" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
+          <Link href="/find-hospital" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             Find Hospital
           </Link>
-          <Link href="/search" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
+          <Link href="/search" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             All Hospitals
           </Link>
-          <Link href="/#how-it-works" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
+          <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             About Us
           </Link>
-          <Link href="/#faq" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
+          <Link href="/#faq" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             FAQ
           </Link>
         </nav>
@@ -51,23 +51,23 @@ export function Header() {
         {/* Mobile Menu Toggle */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
+          className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileOpen ? <X className="w-5 h-5 text-foreground" /> : <Menu className="w-5 h-5 text-foreground" />}
         </button>
       </div>
 
       {/* Mobile Nav */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-slate-100 bg-white animate-fade-in">
+        <div className="md:hidden border-t border-white/10 glass animate-fade-in">
           <div className="px-4 py-4 flex flex-col gap-3">
             <Link href="/" className="text-sm font-medium text-primary py-2" onClick={() => setMobileOpen(false)}>Home</Link>
-            <Link href="/find-hospital" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>Find Hospital</Link>
-            <Link href="/search" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>All Hospitals</Link>
-            <Link href="/#how-it-works" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>About Us</Link>
-            <Link href="/#faq" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>FAQ</Link>
-            <hr className="border-slate-100" />
+            <Link href="/find-hospital" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>Find Hospital</Link>
+            <Link href="/search" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>All Hospitals</Link>
+            <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>About Us</Link>
+            <Link href="/#faq" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>FAQ</Link>
+            <hr className="border-white/10" />
             <Link href="/admin" className="btn-primary text-sm text-center" onClick={() => setMobileOpen(false)}>Admin Log In</Link>
           </div>
         </div>

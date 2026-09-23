@@ -152,12 +152,12 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
   ];
 
   return (
-    <section className="relative overflow-hidden bg-white">
+    <section className="relative overflow-hidden py-12 md:py-20">
       {/* Background decorations */}
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/[0.03] rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-secondary/[0.04] rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-secondary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 md:pt-20 md:pb-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left: Text + Search */}
           <div className="animate-slide-in-left">
@@ -170,10 +170,10 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
 
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-foreground leading-[1.1] tracking-tight mb-6">
               Find the Right{" "}
-              <span className="gradient-text">Hospital</span> for You
+              <span className="gradient-text text-gradient-brand">Hospital</span> for You
             </h1>
 
-            <p className="text-lg text-slate-500 leading-relaxed max-w-lg mb-8">
+            <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mb-8">
               Search {stats.totalHospitals > 0 ? `${stats.totalHospitals} PM-JAY empanelled hospitals` : 'hospitals'} across {stats.totalSpecialties > 0 ? `${stats.totalSpecialties} specialties` : 'specialties'}. Compare costs, outcomes, and certifications — powered by transparent AI.
             </p>
 
@@ -190,7 +190,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search for hospitals, conditions, treatments..."
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-slate-400"
+                    className="w-full pl-12 pr-4 py-4 glass bg-background/80 border border-white/10 rounded-xl text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-muted-foreground text-foreground"
                   />
                 </div>
                 <button
@@ -208,7 +208,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                 type="button"
                 onClick={handleUseLocation}
                 disabled={locating}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all duration-200 disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 glass bg-background/50 border border-white/10 rounded-full text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-all duration-200 disabled:opacity-50"
               >
                 {locating ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -221,11 +221,10 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
               <button
                 type="button"
                 onClick={() => setShowFilters(!showFilters)}
-                className={`inline-flex items-center gap-2 px-4 py-2 border rounded-full text-xs font-medium transition-all duration-200 ${
-                  showFilters
+                className={`inline-flex items-center gap-2 px-4 py-2 border rounded-full text-xs font-medium transition-all duration-200 ${showFilters
                     ? "bg-primary text-white border-primary"
-                    : "bg-white border-slate-200 text-slate-600 hover:border-primary hover:text-primary hover:bg-primary/5"
-                }`}
+                    : "glass bg-background/50 border-white/10 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5"
+                  }`}
               >
                 <Filter className="w-3.5 h-3.5" />
                 {showFilters ? "Hide Filters" : "🔍 Manual Filters"}
@@ -258,11 +257,11 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
             {showFilters && (
               <form
                 onSubmit={handleFilterSearch}
-                className="bg-slate-50/80 backdrop-blur-sm border border-slate-200 rounded-2xl p-5 mb-4 animate-fade-in space-y-5"
+                className="glass bg-background/50 border border-white/10 rounded-2xl p-5 mb-4 animate-fade-in space-y-5"
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-city" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-city" className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       <MapPin className="w-3 h-3" /> City / Location
                     </label>
                     <input
@@ -272,11 +271,11 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="e.g. Pune, Delhi"
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full px-3 py-2.5 bg-background border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-condition" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-condition" className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       <Pill className="w-3 h-3" /> Disease / Condition
                     </label>
                     <input
@@ -286,11 +285,11 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                       value={condition}
                       onChange={(e) => setCondition(e.target.value)}
                       placeholder="e.g. Heart attack, Kidney failure"
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full px-3 py-2.5 bg-background border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-specialty" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-specialty" className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       <Stethoscope className="w-3 h-3" /> Specialty (Auto-detected)
                     </label>
                     <input
@@ -300,11 +299,11 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                       value={specialty}
                       onChange={(e) => setSpecialty(e.target.value)}
                       placeholder="e.g. Cardiology"
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full px-3 py-2.5 bg-background border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-budget" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="filter-budget" className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       <IndianRupee className="w-3 h-3" /> Max Budget (₹)
                     </label>
                     <input
@@ -314,12 +313,12 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                       value={maxBudget}
                       onChange={(e) => setMaxBudget(e.target.value)}
                       placeholder="e.g. 500000"
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full px-3 py-2.5 bg-background border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
                     />
                     {suggestedCost && (
-                      <div className="mt-1.5 p-2 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
-                        <p className="text-xs text-blue-800 leading-tight">
+                      <div className="mt-1.5 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-blue-400 leading-tight">
                           Estimated: <strong>₹{suggestedCost.min.toLocaleString('en-IN')} – ₹{suggestedCost.max.toLocaleString('en-IN')}</strong> for {specialty}
                         </p>
                       </div>
@@ -329,18 +328,17 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
 
                 {/* Required Facilities */}
                 <div className="space-y-2">
-                  <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     <Activity className="w-3 h-3" /> Required Facilities
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {Object.keys(facilities).map((fac) => (
                       <label
                         key={fac}
-                        className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-all text-sm ${
-                          facilities[fac as keyof typeof facilities]
+                        className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-all text-sm ${facilities[fac as keyof typeof facilities]
                             ? "bg-primary/10 border-primary text-primary font-semibold"
-                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                        }`}
+                            : "bg-background border-white/10 text-muted-foreground hover:border-white/20 hover:bg-white/5"
+                          }`}
                       >
                         <input
                           type="checkbox"
@@ -358,7 +356,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                   <button
                     type="button"
                     onClick={() => { setCity(""); setCondition(""); setSpecialty(""); setMaxBudget(""); setFacilities({ ICU: false, Emergency: false, Dialysis: false, NICU: false }); }}
-                    className="px-4 py-2.5 border border-slate-200 text-slate-500 rounded-xl text-xs font-semibold hover:bg-white transition-colors"
+                    className="px-4 py-2.5 border border-white/10 text-muted-foreground rounded-xl text-xs font-semibold hover:bg-white/5 transition-colors"
                   >
                     Clear
                   </button>
@@ -379,15 +377,15 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
           {/* Right: Image Collage */}
           <div className="hidden lg:block animate-slide-in-right relative">
             {/* Main image card */}
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-primary/10 border border-slate-100">
-              <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 via-primary-light to-secondary/10 flex items-center justify-center">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-primary/10 glass border border-white/5">
+              <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
                 {/* Decorative medical illustration */}
                 <div className="text-center p-8">
-                  <div className="w-24 h-24 mx-auto rounded-full bg-white shadow-lg flex items-center justify-center mb-6">
+                  <div className="w-24 h-24 mx-auto rounded-full glass flex items-center justify-center mb-6">
                     <Building2 className="w-12 h-12 text-primary" />
                   </div>
                   <h3 className="text-xl font-bold text-foreground mb-2">PM-JAY Hospital Index</h3>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     {statsLoading ? "Loading..." : `${stats.totalHospitals} hospitals · ${stats.totalSpecialties} specialties`}
                   </p>
                 </div>
@@ -395,31 +393,31 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
             </div>
 
             {/* Floating stats cards — all live from DB */}
-            <div className="absolute -left-6 top-8 bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-4 border border-slate-100 animate-float">
+            <div className="absolute -left-6 top-8 glass bg-background/80 rounded-2xl shadow-2xl shadow-black/20 p-4 border border-white/5 animate-float">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <Database className="w-5 h-5 text-green-600" />
+                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <Database className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
                   <p className="text-lg font-bold text-foreground">{statsLoading ? "..." : stats.withCostData}</p>
-                  <p className="text-xs text-slate-500">With Cost Data</p>
+                  <p className="text-xs text-muted-foreground">With Cost Data</p>
                 </div>
               </div>
             </div>
 
-            <div className="absolute -right-4 bottom-12 bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-4 border border-slate-100 animate-float" style={{ animationDelay: "2s" }}>
+            <div className="absolute -right-4 bottom-12 glass bg-background/80 rounded-2xl shadow-2xl shadow-black/20 p-4 border border-white/5 animate-float" style={{ animationDelay: "2s" }}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <HeartPulse className="w-5 h-5 text-amber-500" />
+                <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                  <HeartPulse className="w-5 h-5 text-amber-400" />
                 </div>
                 <div>
                   <p className="text-lg font-bold text-foreground">{statsLoading ? "..." : stats.pmjayEmpanelled}</p>
-                  <p className="text-xs text-slate-500">PM-JAY Listed</p>
+                  <p className="text-xs text-muted-foreground">PM-JAY Listed</p>
                 </div>
               </div>
             </div>
 
-            <div className="absolute left-1/2 -translate-x-1/2 -bottom-4 bg-white rounded-2xl shadow-xl shadow-slate-200/60 px-5 py-3 border border-slate-100 animate-float" style={{ animationDelay: "4s" }}>
+            <div className="absolute left-1/2 -translate-x-1/2 -bottom-4 glass bg-background/80 rounded-2xl shadow-2xl shadow-black/20 px-5 py-3 border border-white/5 animate-float" style={{ animationDelay: "4s" }}>
               <div className="flex items-center gap-2">
                 <Stethoscope className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium text-foreground">

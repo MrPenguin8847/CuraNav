@@ -25,7 +25,7 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="bg-foreground text-white">
+    <footer className="bg-background border-t border-white/5 text-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
           {/* Brand */}
@@ -38,21 +38,21 @@ export function Footer() {
                 Cura<span className="text-primary-light">Nav</span>
               </span>
             </Link>
-            <p className="text-sm text-slate-400 leading-relaxed mb-6 max-w-sm">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6 max-w-sm">
               CuraNav helps you discover and compare PM-JAY empanelled hospitals using
               transparent, AI-powered search backed by NHA data.
               We don&apos;t diagnose or recommend — we inform.
             </p>
             <div className="space-y-3">
-              <div className="flex items-center gap-3 text-sm text-slate-400">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Mail className="w-4 h-4 text-primary-light" />
                 <span>contact@curanav.in</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-400">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Phone className="w-4 h-4 text-primary-light" />
                 <span>+91 98765 43210</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-400">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <MapPin className="w-4 h-4 text-primary-light" />
                 <span>Chandigarh, India</span>
               </div>
@@ -62,7 +62,7 @@ export function Footer() {
           {/* Link columns */}
           {Object.entries(footerLinks).map(([heading, links]) => (
             <div key={heading}>
-              <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">
+              <h4 className="text-sm font-bold text-foreground mb-4 uppercase tracking-wider">
                 {heading}
               </h4>
               <ul className="space-y-3">
@@ -70,7 +70,7 @@ export function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-slate-400 hover:text-primary-light transition-colors"
+                      className="text-sm text-muted-foreground hover:text-primary-light transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -82,8 +82,8 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-slate-500">
+        <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground/60">
             © 2026 CuraNav. All rights reserved. Prototype for TECHNOVA 2026 — Responsible AI Theme.
           </p>
           <div className="flex items-center gap-4">

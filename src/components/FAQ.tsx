@@ -40,7 +40,7 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="section-padding section-alt">
+    <section id="faq" className="section-padding py-24">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest rounded-full mb-4">
@@ -48,9 +48,9 @@ export function FAQ() {
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Frequently Asked{" "}
-            <span className="gradient-text">Questions</span>
+            <span className="gradient-text text-gradient-brand">Questions</span>
           </h2>
-          <p className="text-slate-500 max-w-xl mx-auto">
+          <p className="text-muted-foreground max-w-xl mx-auto">
             Everything you need to know about using CuraNav for your healthcare
             decisions.
           </p>
@@ -62,10 +62,10 @@ export function FAQ() {
             return (
               <div
                 key={index}
-                className={`bg-white border rounded-2xl transition-all duration-300 ${
+                className={`glass rounded-2xl transition-all duration-300 ${
                   isOpen
-                    ? "border-primary/20 shadow-md shadow-primary/5"
-                    : "border-slate-100 shadow-sm"
+                    ? "border-primary/20 bg-background/50"
+                    : "border-transparent"
                 }`}
               >
                 <button
@@ -80,14 +80,14 @@ export function FAQ() {
                     {faq.question}
                   </span>
                   <ChevronDown
-                    className={`w-5 h-5 flex-shrink-0 text-slate-400 transition-transform duration-300 ${
+                    className={`w-5 h-5 flex-shrink-0 text-muted-foreground transition-transform duration-300 ${
                       isOpen ? "rotate-180 text-primary" : ""
                     }`}
                   />
                 </button>
                 {isOpen && (
                   <div className="px-5 pb-5 -mt-1">
-                    <p className="text-sm text-slate-500 leading-relaxed">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       {faq.answer}
                     </p>
                   </div>

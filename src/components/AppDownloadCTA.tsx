@@ -78,14 +78,14 @@ export function AppDownloadCTA() {
               </div>
 
               {/* Floating accent card */}
-              <div className="absolute -right-8 top-12 bg-white rounded-2xl shadow-xl p-4 animate-float border border-slate-100">
+              <div className="absolute -right-8 top-12 glass rounded-2xl p-4 animate-float">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                    <span className="text-green-600 text-xs font-bold">✓</span>
+                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <span className="text-green-400 text-xs font-bold">✓</span>
                   </div>
                   <div>
                     <p className="text-xs font-bold text-foreground">Verified</p>
-                    <p className="text-[10px] text-slate-500">NABH Accredited</p>
+                    <p className="text-[10px] text-muted-foreground">NABH Accredited</p>
                   </div>
                 </div>
               </div>

@@ -26,16 +26,16 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="section-padding bg-white">
+    <section id="how-it-works" className="section-padding py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest rounded-full mb-4">
             Simple Process
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            How <span className="gradient-text">CuraNav</span> Works
+            How <span className="gradient-text text-gradient-brand">CuraNav</span> Works
           </h2>
-          <p className="text-slate-500 max-w-xl mx-auto">
+          <p className="text-muted-foreground max-w-xl mx-auto">
             From a single sentence to a confident, informed decision — in three
             steps, backed by real government healthcare data.
           </p>
@@ -55,7 +55,7 @@ export function HowItWorks() {
                 {number}
               </div>
 
-              <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 w-full">
+              <div className="glass rounded-2xl p-8 hover-lift w-full">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 mx-auto">
                   <Icon className="w-6 h-6 text-primary" />
                 </div>
@@ -63,7 +63,7 @@ export function HowItWorks() {
                 <h3 className="text-lg font-bold text-foreground mb-3">
                   {heading}
                 </h3>
-                <p className="text-sm text-slate-500 leading-relaxed">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {description}
                 </p>
               </div>

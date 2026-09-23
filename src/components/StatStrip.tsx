@@ -17,24 +17,24 @@ export function StatStrip() {
       icon: Stethoscope,
       value: loading ? "..." : `${stats.totalSpecialties}`,
       label: "Specialties Covered",
-      color: "text-blue-600 bg-blue-100",
+      color: "text-blue-400 bg-blue-500/10",
     },
     {
       icon: ShieldCheck,
       value: loading ? "..." : `${stats.pmjayEmpanelled}`,
       label: "PM-JAY Empanelled",
-      color: "text-green-600 bg-green-100",
+      color: "text-green-400 bg-green-500/10",
     },
     {
       icon: Sparkles,
       value: "AI",
       label: "Powered Search",
-      color: "text-amber-600 bg-amber-100",
+      color: "text-amber-400 bg-amber-500/10",
     },
   ];
 
   return (
-    <section className="py-6 bg-white border-y border-slate-100">
+    <section className="py-6 border-y border-white/5 relative z-10 glass">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {items.map(({ icon: Icon, value, label, color }) => (
@@ -49,7 +49,7 @@ export function StatStrip() {
                 <p className="text-2xl font-extrabold text-foreground tracking-tight leading-none">
                   {value}
                 </p>
-                <p className="text-sm text-muted font-medium mt-0.5">
+                <p className="text-sm text-muted-foreground font-medium mt-0.5">
                   {label}
                 </p>
               </div>

@@ -12,16 +12,19 @@ import { AppDownloadCTA } from "@/components/AppDownloadCTA";
 import { FAQ } from "@/components/FAQ";
 import { Footer } from "@/components/Footer";
 
+import { AurixScrollCanvas } from "@/components/aurix/AurixScrollCanvas";
+
 export default function Home() {
   const [query, setQuery] = useState("");
 
   return (
-    <div className="min-h-screen flex flex-col bg-white font-sans">
+    <div className="min-h-screen flex flex-col font-sans">
       <Header />
 
       <main className="flex-grow">
         <HeroSearch query={query} setQuery={setQuery} />
         <StatStrip />
+        <AurixScrollCanvas />
         <BrowseByCondition onSelect={setQuery} />
         <HowItWorks />
         <WhyChooseUs />
