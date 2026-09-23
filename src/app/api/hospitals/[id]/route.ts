@@ -65,15 +65,30 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { reviewStatus } = body;
+    const { reviewStatus, verificationStatus } = body;
+    const updateData: any = {};
 
-    if (!['pending', 'approved', 'rejected'].includes(reviewStatus)) {
-      return NextResponse.json({ error: "Invalid reviewStatus" }, { status: 400 });
+    if (reviewStatus) {
+      if (!['pending', 'approved', 'rejected'].includes(reviewStatus)) {
+        return NextResponse.json({ error: "Invalid reviewStatus" }, { status: 400 });
+      }
+      updateData.review_status = reviewStatus;
+    }
+
+    if (verificationStatus) {
+      if (!['pending', 'verified', 'simulated', 'unverified'].includes(verificationStatus)) {
+        return NextResponse.json({ error: "Invalid verificationStatus" }, { status: 400 });
+      }
+      updateData.verification_status = verificationStatus;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
     const { data, error } = await supabaseAdmin
       .from("hospitals")
-      .update({ review_status: reviewStatus })
+      .update(updateData)
       .eq("hospital_id", id)
       .select("*")
       .single();

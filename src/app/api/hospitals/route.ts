@@ -85,12 +85,28 @@ export async function GET(req: NextRequest) {
     filtersApplied.city = city;
   }
 
-  if (specialty) {
-    query = query.contains("specialties", [specialty]);
-    filtersApplied.specialty = specialty;
+  // Fallback mapping for the mock dataset (which lacks 'condition_tag' and granular specialties like Nephrology)
+  let resolvedSpecialty = specialty;
+  if (condition && !resolvedSpecialty) {
+    const c = condition.toLowerCase();
+    if (c.includes("kidney") || c.includes("renal")) resolvedSpecialty = "General Medicine";
+    else if (c.includes("heart") || c.includes("cardio")) resolvedSpecialty = "Cardiology";
+    else if (c.includes("cancer") || c.includes("tumor") || c.includes("oncol")) resolvedSpecialty = "General Surgery";
+    else if (c.includes("bone") || c.includes("joint")) resolvedSpecialty = "Orthopaedics";
+    else if (c.includes("child") || c.includes("pediatric") || c.includes("paediatric")) resolvedSpecialty = "Paediatric Medical Management";
+    else if (c.includes("pregnan") || c.includes("matern") || c.includes("women")) resolvedSpecialty = "Obstetrics & Gynaecology";
+    else if (c.includes("burn")) resolvedSpecialty = "Burns Management";
+    else if (c.includes("eye") || c.includes("vision")) resolvedSpecialty = "Ophthalmology";
   }
 
-  if (condition) {
+  if (resolvedSpecialty && condition) {
+    query = query.or(`specialties.cs.{${resolvedSpecialty}},condition_tag.ilike.%${condition}%`);
+    filtersApplied.specialty = resolvedSpecialty;
+    filtersApplied.condition = condition;
+  } else if (resolvedSpecialty) {
+    query = query.contains("specialties", [resolvedSpecialty]);
+    filtersApplied.specialty = resolvedSpecialty;
+  } else if (condition) {
     query = query.ilike("condition_tag", `%${condition}%`);
     filtersApplied.condition = condition;
   }

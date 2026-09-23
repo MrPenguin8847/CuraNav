@@ -62,6 +62,29 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUpdateVerification = async (id: string, newStatus: "verified" | "pending" | "simulated" | "unverified") => {
+    // Optimistic UI update
+    setHospitals((prev) =>
+      prev.map((h) => (h.hospitalId === id ? { ...h, verificationStatus: newStatus } : h))
+    );
+
+    try {
+      const res = await fetch(`/api/hospitals/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verificationStatus: newStatus }),
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to update verification status");
+      }
+    } catch (err) {
+      console.error(err);
+      // Revert on failure by refetching
+      fetchHospitals();
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this hospital? This action cannot be undone.")) return;
     
@@ -203,7 +226,8 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4">Hospital Name</th>
                     <th className="px-6 py-4">Location</th>
                     <th className="px-6 py-4">Data Source</th>
-                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Review Status</th>
+                    <th className="px-6 py-4">Verification</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -230,8 +254,25 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4">
                         <StatusBadge status={hospital.reviewStatus} />
                       </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${hospital.verificationStatus === 'verified' ? 'bg-success/10 text-success border-success/20' : hospital.verificationStatus === 'pending' ? 'bg-warning/10 text-warning border-warning/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                          {hospital.verificationStatus === 'verified' && <Check className="w-3.5 h-3.5" />}
+                          {hospital.verificationStatus === 'pending' && <Clock className="w-3.5 h-3.5" />}
+                          {hospital.verificationStatus === 'simulated' && <AlertCircle className="w-3.5 h-3.5" />}
+                          <span className="capitalize">{hospital.verificationStatus}</span>
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
+                          {hospital.verificationStatus !== "verified" && (
+                            <button
+                              onClick={() => handleUpdateVerification(hospital.hospitalId, "verified")}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-semibold rounded-lg transition-colors"
+                            >
+                              <Check className="w-4 h-4" />
+                              Verify
+                            </button>
+                          )}
                           {hospital.reviewStatus !== "approved" && (
                             <button
                               onClick={() => handleUpdateStatus(hospital.hospitalId, "approved")}

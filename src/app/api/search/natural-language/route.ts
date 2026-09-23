@@ -128,6 +128,69 @@ EXPECTED JSON SCHEMA:
   ]
 }`;
 
+// ── AIML API call (Primary) ───────────────────────────────────────────────────
+async function callAimlApi(apiKey: string, query: string) {
+  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    try {
+      const res = await fetch("https://api.aimlapi.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-5-5",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: query }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0,
+          max_tokens: 400,
+        }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        const isTransient = [408, 429, 500, 502, 503, 504].includes(res.status);
+        
+        if (isTransient && attempt < RETRY_DELAYS.length) {
+          console.warn(`[AIML API] Attempt ${attempt + 1} - Transient error ${res.status}. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
+          await sleep(RETRY_DELAYS[attempt]);
+          continue;
+        }
+        throw new Error(`AIML API HTTP ${res.status}: ${errBody}`);
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error("Empty response from AIML API");
+
+      const parsed = parseModelJson(content);
+      return validateResponseSchema(parsed);
+
+    } catch (err: unknown) {
+      if (err instanceof JsonParseError || err instanceof ValidationError) {
+        throw err;
+      }
+      
+      const errMsg = err instanceof Error ? err.message : String(err);
+      
+      if (attempt < RETRY_DELAYS.length && (errMsg.includes("fetch") || errMsg.includes("network"))) {
+        console.warn(`[AIML API] Attempt ${attempt + 1} - Network error. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
+        await sleep(RETRY_DELAYS[attempt]);
+        continue;
+      }
+      
+      if (attempt >= RETRY_DELAYS.length) {
+        throw new Error(`AIML API failed after ${attempt} retries: ${errMsg}`);
+      }
+      
+      throw err;
+    }
+  }
+}
+
 // ── OpenRouter API call ───────────────────────────────────────────────────────
 async function callOpenRouter(apiKey: string, query: string) {
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
@@ -141,7 +204,7 @@ async function callOpenRouter(apiKey: string, query: string) {
           "X-Title": "CuraNav",
         },
         body: JSON.stringify({
-          model: "qwen/qwen3.8-27b:free",
+          model: "openai/gpt-4o",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -206,7 +269,7 @@ async function callGroq(apiKey: string, query: string) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "llama3-8b-8192",
+          model: "llama-3.3-70b-versatile",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -398,18 +461,25 @@ export async function POST(req: Request) {
     }
 
     // Collect all configured providers
-    const providers: { name: string; type: "openrouter" | "gemini" | "groq"; key: string }[] = [];
+    const providers: { name: string; type: "aiml" | "openrouter" | "gemini" | "groq"; key: string }[] = [];
     
-    // Dynamically find all OPENROUTER_API_KEY and GROQ_API_KEY variables
+    // OpenRouter first (primary provider)
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("OPENROUTER_API_KEY") && value) {
         providers.push({ name: key, type: "openrouter", key: value });
+      }
+    }
+
+    // Then AIML API and Groq as fallbacks
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith("AIML_API_KEY") && value) {
+        providers.push({ name: key, type: "aiml", key: value });
       } else if (key.startsWith("GROQ_API_KEY") && value) {
         providers.push({ name: key, type: "groq", key: value });
       }
     }
     
-    // Add Gemini if available
+    // Add Gemini last
     if (process.env.GEMINI_API_KEY) {
       providers.push({ name: "GEMINI_API_KEY", type: "gemini", key: process.env.GEMINI_API_KEY });
     }
@@ -418,7 +488,9 @@ export async function POST(req: Request) {
 
     for (const provider of providers) {
       try {
-        if (provider.type === "openrouter") {
+        if (provider.type === "aiml") {
+          result = await callAimlApi(provider.key, fullQuery);
+        } else if (provider.type === "openrouter") {
           result = await callOpenRouter(provider.key, fullQuery);
         } else if (provider.type === "groq") {
           result = await callGroq(provider.key, fullQuery);
