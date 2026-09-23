@@ -95,10 +95,14 @@ IMPORTANT RULES:
     const providers: { name: string; type: "openrouter" | "gemini" | "groq"; key: string }[] = [];
     
     for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith("GROQ_API_KEY") && value) {
+        providers.push({ name: key, type: "groq", key: value });
+      }
+    }
+    
+    for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("OPENROUTER_API_KEY") && value) {
         providers.push({ name: key, type: "openrouter", key: value });
-      } else if (key.startsWith("GROQ_API_KEY") && value) {
-        providers.push({ name: key, type: "groq", key: value });
       }
     }
     
@@ -121,7 +125,7 @@ IMPORTANT RULES:
               "X-Title": "CuraNav",
             },
             body: JSON.stringify({
-              model: "meta-llama/llama-3.3-70b-instruct:free",
+              model: "qwen/qwen3.8-27b:free",
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },
@@ -146,7 +150,7 @@ IMPORTANT RULES:
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              model: "mixtral-8x7b-32768",
+              model: "openai/gpt-oss-20b",
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },

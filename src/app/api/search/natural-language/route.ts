@@ -204,7 +204,7 @@ async function callOpenRouter(apiKey: string, query: string) {
           "X-Title": "CuraNav",
         },
         body: JSON.stringify({
-          model: "meta-llama/llama-3.3-70b-instruct:free",
+          model: "qwen/qwen3.8-27b:free",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -269,7 +269,7 @@ async function callGroq(apiKey: string, query: string) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
+          model: "openai/gpt-oss-20b",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: query }
@@ -471,19 +471,24 @@ export async function POST(req: Request) {
     // Collect all configured providers
     const providers: { name: string; type: "aiml" | "openrouter" | "gemini" | "groq"; key: string }[] = [];
     
-    // OpenRouter first (primary provider)
+    // Groq first (primary provider — most reliable)
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith("GROQ_API_KEY") && value) {
+        providers.push({ name: key, type: "groq", key: value });
+      }
+    }
+
+    // Then OpenRouter as fallback
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("OPENROUTER_API_KEY") && value) {
         providers.push({ name: key, type: "openrouter", key: value });
       }
     }
 
-    // Then AIML API and Groq as fallbacks
+    // Then AIML API as a fallback
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("AIML_API_KEY") && value) {
         providers.push({ name: key, type: "aiml", key: value });
-      } else if (key.startsWith("GROQ_API_KEY") && value) {
-        providers.push({ name: key, type: "groq", key: value });
       }
     }
     
