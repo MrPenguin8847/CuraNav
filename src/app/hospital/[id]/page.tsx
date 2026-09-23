@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   FileText,
   SearchX,
+  TrendingUp,
+  Award,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -332,31 +334,83 @@ export default async function HospitalDetailPage({
           )}
         </Section>
 
-        {/* ── 5. INDICATIVE COST ── */}
-        <Section title="Indicative Cost">
-          <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 mb-3">
-            <IndianRupee className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
-            <div>
-              <p className="text-3xl font-extrabold text-foreground tracking-tight">
-                {costMin != null && costMax != null
-                  ? `${formatCost(costMin)} – ${formatCost(costMax)}`
-                  : pmjayEmpanelled ? "Standard PM-JAY Rates" : "Contact hospital for pricing"}
+        {/* ── 5. PERFORMANCE & CERTIFICATION DASHBOARD ── */}
+        <Section title="Performance & Certification Dashboard">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            {/* Average Costs */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2">
+                <IndianRupee className="w-4 h-4 text-primary" />
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Average Cost</h3>
+              </div>
+              <div className="space-y-3 mt-1">
+                {/* Private Cost */}
+                <div>
+                  <span className="text-xs font-semibold text-muted block mb-0.5">Private / Uninsured</span>
+                  <p className="text-xl font-extrabold text-foreground tracking-tight">
+                    {costMin != null && costMax != null
+                      ? `${formatCost(costMin)} – ${formatCost(costMax)}`
+                      : "Contact for pricing"}
+                  </p>
+                </div>
+                {/* PM-JAY Cost */}
+                {pmjayEmpanelled && (
+                  <div>
+                    <span className="text-xs font-semibold text-muted block mb-0.5">PM-JAY (Govt)</span>
+                    <span className="inline-flex items-center gap-1 text-success font-semibold text-sm bg-success/10 px-2.5 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Standard Rates (Free)
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Patient Volumes */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="w-4 h-4 text-primary" />
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Patient Volumes</h3>
+              </div>
+              <p className="text-xl font-extrabold text-foreground tracking-tight">
+                {annualProcedureVolume != null ? `${annualProcedureVolume.toLocaleString("en-IN")}` : "N/A"}
               </p>
-              <p className="text-xs text-muted mt-1.5 leading-relaxed">
-                {costMin != null
-                  ? "Indicative cost — actual pricing may vary with patient condition, package inclusions, doctor fees, consumables, and availability. Confirm with hospital before making any financial decision."
-                  : pmjayEmpanelled ? "Rates strictly follow Government PM-JAY standard packages for eligible beneficiaries." : "Cost data not available from NHA. Contact the hospital directly for pricing."}
+              <p className="text-xs text-muted mt-1">procedures/year (reported)</p>
+            </div>
+
+            {/* Outcomes */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Reported Outcomes</h3>
+              </div>
+              <p className="text-sm font-semibold text-foreground italic">
+                {outcomeMetric ? `"${outcomeMetric}"` : "N/A"}
               </p>
             </div>
+
+            {/* Verified Certifications */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2">
+                <Award className="w-4 h-4 text-primary" />
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Certifications</h3>
+              </div>
+              <div className="space-y-2">
+                <VerificationBadge status={verificationStatus} lastVerified={lastVerified} />
+                {accreditation.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {accreditation.map((a) => (
+                      <span key={a} className="px-2 py-0.5 bg-white text-slate-600 text-xs font-semibold rounded-full border border-slate-200">
+                        {a}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
-          {annualProcedureVolume != null && annualProcedureVolume > 0 && (
-            <p className="text-xs text-muted">
-              Procedures/year (reported):{" "}
-              <span className="font-semibold text-foreground">
-                {annualProcedureVolume.toLocaleString("en-IN")}
-              </span>
-            </p>
-          )}
         </Section>
 
         {/* ── 6. TRUST PANEL ── */}
@@ -396,17 +450,7 @@ export default async function HospitalDetailPage({
             )}
           </div>
 
-          {outcomeMetric && (
-            <div className="p-4 bg-white/70 rounded-xl border border-primary/15">
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
-                Reported data (not a CuraNav claim)
-              </p>
-              <p className="text-sm text-foreground italic">&ldquo;{outcomeMetric}&rdquo;</p>
-              <p className="text-xs text-muted mt-1">
-                Reported by the hospital or third-party source. CuraNav has not independently verified this figure.
-              </p>
-            </div>
-          )}
+
 
           <div className="flex items-start gap-3 p-4 bg-warning/10 border border-warning/20 rounded-xl">
             <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />

@@ -236,6 +236,10 @@ function MobileCard({
           note="highest"
         />
         <MetricRow
+          label="Outcomes"
+          value={hospital.outcomeMetric ? hospital.outcomeMetric : "N/A"}
+        />
+        <MetricRow
           label="Accreditation"
           value={
             hospital.accreditation.length > 0
@@ -583,6 +587,100 @@ function ComparePageInner() {
               </thead>
 
               <tbody className="divide-y divide-border">
+                {/* ── KEY PERFORMANCE DASHBOARD METRICS ── */}
+                
+                {/* 1. Procedures/year */}
+                <TableRow
+                  label="Patient Volumes"
+                  highlightIdx={volumeBest}
+                  cells={hospitals.map((h, i) => (
+                    <span key={i} className={i === volumeBest && h.annualProcedureVolume != null ? "text-success font-semibold" : ""}>
+                      {h.annualProcedureVolume != null ? `${h.annualProcedureVolume.toLocaleString("en-IN")} procedures/year` : "Data unavailable"}
+                      {i === volumeBest && h.annualProcedureVolume != null && (
+                        <span className="ml-1 text-xs font-medium text-success/70">(highest)</span>
+                      )}
+                    </span>
+                  ))}
+                />
+
+                {/* 2. Outcomes */}
+                <TableRow
+                  label="Reported Outcomes"
+                  cells={hospitals.map((h, i) => (
+                    <span key={i} className="text-sm font-medium">
+                      {h.outcomeMetric ? h.outcomeMetric : "Data unavailable"}
+                    </span>
+                  ))}
+                />
+
+                {/* 3. Cost */}
+                <TableRow
+                  label="Average Costs"
+                  highlightIdx={costBest}
+                  cells={hospitals.map((h, i) => (
+                    <div key={i} className="space-y-1.5">
+                      {/* Private Cost */}
+                      <div>
+                        <span className="text-xs font-semibold text-muted uppercase tracking-wider block mb-0.5">Private</span>
+                        {h.costMin != null && h.costMax != null ? (
+                          <>
+                            <p className={`font-bold ${i === costBest ? "text-success" : "text-foreground"}`}>
+                              {formatCost(h.costMin)} – {formatCost(h.costMax)}
+                              {i === costBest && (
+                                <span className="ml-1 text-xs font-medium text-success/70">(lowest)</span>
+                              )}
+                            </p>
+                            <p className="text-xs text-primary font-semibold">
+                              Avg: {formatCost(Math.round(((h.costMin ?? 0) + (h.costMax ?? 0)) / 2))}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium text-foreground">Contact for pricing</p>
+                        )}
+                      </div>
+
+                      {/* PM-JAY Cost */}
+                      {h.pmjayEmpanelled && (
+                        <div>
+                          <span className="text-xs font-semibold text-muted uppercase tracking-wider block mb-0.5">PM-JAY (Govt)</span>
+                          <span className="inline-flex items-center gap-1 text-success font-semibold text-xs bg-success/10 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Standard Rates (Free)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                />
+
+                {/* 4. Verified Certifications (Accreditation + Verification Badge) */}
+                <TableRow
+                  label="Verified Certifications"
+                  cells={hospitals.map((h) => (
+                    <div key={h.hospitalId} className="space-y-2">
+                      <VerificationBadge
+                        status={h.verificationStatus}
+                        lastVerified={h.lastVerified}
+                      />
+                      {h.accreditation.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {h.accreditation.map((a) => (
+                            <span
+                              key={a}
+                              className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full border border-slate-200"
+                            >
+                              {a}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted text-xs">No specific accreditations listed</span>
+                      )}
+                    </div>
+                  ))}
+                />
+
+                {/* ── STANDARD COMPARISON DATA ── */}
                 {/* Address */}
                 <TableRow
                   label="Address"
@@ -651,69 +749,9 @@ function ComparePageInner() {
                   )}
                 />
 
-                {/* Cost — only show if at least one hospital has cost data */}
-                {hospitals.some((h) => h.costMin != null && h.costMax != null) && (
-                  <TableRow
-                    label="Indicative Cost"
-                    highlightIdx={costBest}
-                    cells={hospitals.map((h, i) => (
-                      <div key={i}>
-                        <p className={`font-bold ${i === costBest ? "text-success" : ""}`}>
-                          {h.costMin != null && h.costMax != null
-                            ? `${formatCost(h.costMin)} – ${formatCost(h.costMax)}`
-                            : "Standard PM-JAY Rates"}
-                          {i === costBest && (
-                            <span className="ml-1 text-xs font-medium text-success/70">(lowest)</span>
-                          )}
-                        </p>
-                        {h.costMin != null && h.costMax != null && (
-                          <p className="text-xs text-primary font-semibold">
-                            Avg: {formatCost(Math.round(((h.costMin ?? 0) + (h.costMax ?? 0)) / 2))}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  />
-                )}
 
-                {/* Cost display for PM-JAY hospitals when no one has cost data */}
-                {!hospitals.some((h) => h.costMin != null && h.costMax != null) && (
-                  <TableRow
-                    label="Cost Structure"
-                    cells={hospitals.map((h) => (
-                      <span key={h.hospitalId} className="text-sm">
-                        {h.pmjayEmpanelled ? (
-                          <span className="text-success font-semibold">✓ Standard PM-JAY Rates</span>
-                        ) : (
-                          "Contact for pricing"
-                        )}
-                      </span>
-                    ))}
-                  />
-                )}
 
-                {/* Accreditation — only if someone has it */}
-                {hospitals.some((h) => h.accreditation.length > 0) && (
-                  <TableRow
-                    label="Accreditation"
-                    cells={hospitals.map((h) =>
-                      h.accreditation.length > 0 ? (
-                        <div key={h.hospitalId} className="flex flex-wrap gap-1">
-                          {h.accreditation.map((a) => (
-                            <span
-                              key={a}
-                              className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full border border-slate-200"
-                            >
-                              {a}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span key={h.hospitalId} className="text-muted">—</span>
-                      )
-                    )}
-                  />
-                )}
+
 
                 {/* Facilities — one row per facility in the union set */}
                 {allFacilities.length > 0 && allFacilities.map((facility) => (
@@ -750,36 +788,7 @@ function ComparePageInner() {
                   />
                 )}
 
-                {/* Procedures/year — only if at least one has data */}
-                {hospitals.some((h) => h.annualProcedureVolume != null) && (
-                  <TableRow
-                    label="Procedures/Year"
-                    highlightIdx={volumeBest}
-                    cells={hospitals.map((h, i) => (
-                      <span key={i} className={i === volumeBest ? "text-success font-semibold" : ""}>
-                        {h.annualProcedureVolume != null ? h.annualProcedureVolume.toLocaleString("en-IN") : "—"}
-                        {i === volumeBest && (
-                          <span className="ml-1 text-xs font-medium text-success/70">(highest)</span>
-                        )}
-                      </span>
-                    ))}
-                  />
-                )}
 
-                {/* Verification / Source */}
-                <TableRow
-                  label="Data Source"
-                  muted
-                  cells={hospitals.map((h) => (
-                    <div key={h.hospitalId} className="space-y-1">
-                      <VerificationBadge
-                        status={h.verificationStatus}
-                        lastVerified={h.lastVerified}
-                      />
-                      <p className="text-xs text-muted capitalize">{h.sourceType} source</p>
-                    </div>
-                  ))}
-                />
               </tbody>
             </table>
           </div>

@@ -79,6 +79,9 @@ export function HospitalCard({
     hospitalId,
     name,
     city,
+    address,
+    latitude,
+    longitude,
     specialties,
     costMin,
     costMax,
@@ -91,6 +94,10 @@ export function HospitalCard({
     sourceType,
     distance_km,
   } = hospital;
+
+  const mapUrl = latitude && longitude 
+    ? `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(name + ' ' + (address ?? ''))}`;
 
   const shownFacilities = facilities.slice(0, 4);
   const hiddenCount = facilities.length - shownFacilities.length;
@@ -273,7 +280,15 @@ export function HospitalCard({
    * Render
    * ──────────────────────────────────────────────────────────────────────── */
 
-  const isTopResult = rankIndex === 0 && activeFilters;
+  const hasMeaningfulFilters = activeFilters && (
+    activeFilters.condition ||
+    activeFilters.specialty ||
+    activeFilters.city ||
+    activeFilters.min_budget != null ||
+    activeFilters.max_budget != null ||
+    activeFilters.facilities
+  );
+  const isTopResult = rankIndex === 0 && hasMeaningfulFilters;
 
   return (
     <article
@@ -489,6 +504,15 @@ export function HospitalCard({
             </>
           )}
         </button>
+        <a
+          href={mapUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium border border-border bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          <MapPin className="w-4 h-4 text-primary" />
+          Directions
+        </a>
         <Link
           href={`/hospital/${hospitalId}`}
           className="btn-primary text-sm text-center py-2 px-6"
