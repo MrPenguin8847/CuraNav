@@ -38,6 +38,7 @@ export interface Hospital {
   phone: string | null;
   facilityType: string | null;
   dateOfEstablishment: string | null;
+  distance_km?: number;
 }
 
 export const mockHospitals: Hospital[] = [

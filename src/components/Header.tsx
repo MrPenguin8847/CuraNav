@@ -27,14 +27,17 @@ export function Header() {
           <Link href="/" className="text-sm font-medium text-primary relative after:absolute after:bottom-[-4px] after:left-0 after:w-full after:h-0.5 after:bg-primary after:rounded-full">
             Home
           </Link>
+          <Link href="/find-hospital" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
+            Find Hospital
+          </Link>
           <Link href="/search" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
-            Services
+            All Hospitals
           </Link>
           <Link href="/#how-it-works" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
             About Us
           </Link>
           <Link href="/#faq" className="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
-            Contact
+            FAQ
           </Link>
         </nav>
 
@@ -60,9 +63,10 @@ export function Header() {
         <div className="md:hidden border-t border-slate-100 bg-white animate-fade-in">
           <div className="px-4 py-4 flex flex-col gap-3">
             <Link href="/" className="text-sm font-medium text-primary py-2" onClick={() => setMobileOpen(false)}>Home</Link>
-            <Link href="/search" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>Services</Link>
+            <Link href="/find-hospital" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>Find Hospital</Link>
+            <Link href="/search" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>All Hospitals</Link>
             <Link href="/#how-it-works" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>About Us</Link>
-            <Link href="/#faq" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>Contact</Link>
+            <Link href="/#faq" className="text-sm font-medium text-slate-500 py-2" onClick={() => setMobileOpen(false)}>FAQ</Link>
             <hr className="border-slate-100" />
             <Link href="/admin" className="btn-primary text-sm text-center" onClick={() => setMobileOpen(false)}>Admin Log In</Link>
           </div>

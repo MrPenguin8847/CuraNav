@@ -12,6 +12,7 @@ import {
 import { Hospital } from "@/lib/mockHospitals";
 import { FACILITY_ICONS } from "@/lib/facilityIcons";
 import { VerificationBadge } from "./VerificationBadge";
+import { getEstimatedCost } from "@/lib/costEstimator";
 
 interface HospitalCardProps {
   hospital: Hospital;
@@ -40,6 +41,7 @@ export function HospitalCard({
     verificationStatus,
     lastVerified,
     sourceType,
+    distance_km,
   } = hospital;
 
   const shownFacilities = facilities.slice(0, 4);
@@ -52,6 +54,7 @@ export function HospitalCard({
 
   const whyReasons = [
     `Matches ${matchingSpecialty}`,
+    distance_km != null ? `${distance_km.toFixed(1)} km away` : null,
     facilities.includes("Dialysis") ? "Has Dialysis" : null,
     pmjayEmpanelled ? "PM-JAY empanelled" : null,
     accreditation.length > 0 ? `${accreditation[0]} accredited` : null,
@@ -61,6 +64,9 @@ export function HospitalCard({
     if (!isSelected && compareCount >= 5) return;
     onToggleCompare(hospitalId);
   };
+
+  const specialtyCost = getEstimatedCost(matchingSpecialty);
+  const estimatedAvgCost = specialtyCost ? Math.round((specialtyCost.min + specialtyCost.max) / 2) : null;
 
   return (
     <article
@@ -96,6 +102,11 @@ export function HospitalCard({
           <div className="flex items-center gap-1 mt-1 text-sm text-muted">
             <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
             <span>{city ?? hospital.address ?? "India"}</span>
+            {distance_km != null && (
+              <span className="ml-1 text-xs text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded-md">
+                {distance_km.toFixed(1)} km
+              </span>
+            )}
           </div>
         </div>
 
@@ -125,17 +136,35 @@ export function HospitalCard({
               </p>
             </>
           ) : pmjayEmpanelled ? (
-            <>
-              <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
-              <p className="text-lg font-bold text-success">Standard PM-JAY Rates</p>
-              <p className="text-xs text-muted">Rates strictly follow Govt PM-JAY packages</p>
-            </>
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="text-xs text-muted font-medium mb-0.5">PM-JAY Beneficiary</p>
+                <p className="text-base font-bold text-success leading-tight">Free / Subsidized Rates</p>
+              </div>
+              {estimatedAvgCost && (
+                <div className="border-t border-slate-200/70 pt-1.5 mt-0.5">
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">Non PM-JAY Estimated Avg</p>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {formatCost(estimatedAvgCost)} <span className="text-xs font-normal text-slate-500">for {matchingSpecialty}</span>
+                  </p>
+                </div>
+              )}
+            </div>
           ) : (
-            <>
-              <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
-              <p className="text-base font-semibold text-slate-500">Contact for pricing</p>
-              <p className="text-xs text-muted">Pricing not available yet</p>
-            </>
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="text-xs text-muted font-medium mb-0.5">Pricing</p>
+                <p className="text-base font-semibold text-slate-500">Contact for pricing</p>
+              </div>
+              {estimatedAvgCost && (
+                <div className="border-t border-slate-200/70 pt-1.5 mt-0.5">
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">Estimated Avg Cost</p>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {formatCost(estimatedAvgCost)} <span className="text-xs font-normal text-slate-500">for {matchingSpecialty}</span>
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

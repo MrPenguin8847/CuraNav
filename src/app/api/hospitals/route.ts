@@ -3,6 +3,27 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { createServerClient } from "@/lib/supabase-server";
 import { mapHospital } from "@/lib/mapHospital";
 
+// Helper for demo coordinate resolution
+const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
+  chandigarh: { lat: 30.7333, lon: 76.7794 },
+  mohali: { lat: 30.7046, lon: 76.7179 },
+  panchkula: { lat: 30.6942, lon: 76.8606 },
+  delhi: { lat: 28.7041, lon: 77.1025 },
+  mumbai: { lat: 19.0760, lon: 72.8777 },
+  bangalore: { lat: 12.9716, lon: 77.5946 }
+};
+
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 /**
  * GET /api/hospitals
  *
@@ -22,7 +43,9 @@ export async function GET(req: NextRequest) {
   const city = searchParams.get("city");
   const specialty = searchParams.get("specialty");
   const condition = searchParams.get("condition");
+  const minBudget = searchParams.get("min_budget");
   const maxBudget = searchParams.get("max_budget");
+  const radiusKm = searchParams.get("radius_km");
   const facilitiesParam = searchParams.get("facilities");
   const verifiedOnly = searchParams.get("verified_only") === "true";
   const isAdmin = searchParams.get("admin") === "true";
@@ -50,10 +73,14 @@ export async function GET(req: NextRequest) {
     {};
 
   if (city) {
-    const cities = city.split(',').map(c => c.trim()).filter(Boolean);
-    const conditions = cities.flatMap(c => [`city.ilike.%${c}%`, `state.ilike.%${c}%`, `address.ilike.%${c}%`]);
-    if (conditions.length > 0) {
-      query = query.or(conditions.join(','));
+    // If radius is provided, we don't strictly filter by city name string match in DB,
+    // because we will filter by coordinates later. But we still record it.
+    if (!radiusKm) {
+      const cities = city.split(',').map(c => c.trim()).filter(Boolean);
+      const conditions = cities.flatMap(c => [`city.ilike.%${c}%`, `state.ilike.%${c}%`, `address.ilike.%${c}%`]);
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      }
     }
     filtersApplied.city = city;
   }
@@ -68,10 +95,18 @@ export async function GET(req: NextRequest) {
     filtersApplied.condition = condition;
   }
 
+  if (minBudget) {
+    const budget = parseInt(minBudget, 10);
+    if (!isNaN(budget)) {
+      query = query.gte("cost_max", budget);
+      filtersApplied.min_budget = budget;
+    }
+  }
+
   if (maxBudget) {
     const budget = parseInt(maxBudget, 10);
     if (!isNaN(budget)) {
-      query = query.lte("cost_max", budget);
+      query = query.lte("cost_min", budget);
       filtersApplied.max_budget = budget;
     }
   }
@@ -107,7 +142,26 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const hospitals = (data ?? []).map(mapHospital);
+  let hospitals = (data ?? []).map(mapHospital);
+
+  // Handle geographical radius filtering in memory
+  if (city && radiusKm) {
+    const radius = parseFloat(radiusKm);
+    const firstCity = city.split(',')[0].trim().toLowerCase();
+    const coords = CITY_COORDS[firstCity];
+    
+    if (coords && !isNaN(radius)) {
+      filtersApplied.radius_km = radius;
+      
+      hospitals = hospitals.map(h => {
+        if (h.latitude && h.longitude) {
+          const dist = haversine(coords.lat, coords.lon, h.latitude, h.longitude);
+          return { ...h, distance_km: dist };
+        }
+        return h;
+      }).filter(h => h.distance_km !== undefined && h.distance_km <= radius);
+    }
+  }
 
   return NextResponse.json({
     count: hospitals.length,

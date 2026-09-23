@@ -45,6 +45,7 @@ function SearchResultsInner() {
   const [sort, setSort] = useState<SortKey>("match");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [compareWarning, setCompareWarning] = useState(false);
+  const [showManualFilters, setShowManualFilters] = useState(false);
 
   // ── Fetch from /api/hospitals ─────────────────────────────────────────────
   const fetchHospitals = useCallback(async () => {
@@ -54,6 +55,8 @@ function SearchResultsInner() {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("q");
       params.delete("loc");
+
+      let fallbackCities: string[] = [];
 
       if (rawQuery) {
         // Call natural language API
@@ -67,7 +70,6 @@ function SearchResultsInner() {
           })
         });
         
-        let fallbackCities: string[] = [];
 
         if (nlRes.ok) {
           const nlData = await nlRes.json();
@@ -76,8 +78,13 @@ function SearchResultsInner() {
           if (nlData.filters.condition) params.set("condition", nlData.filters.condition);
           if (nlData.filters.specialty) params.set("specialty", nlData.filters.specialty);
           if (nlData.filters.city) params.set("city", nlData.filters.city);
-          if (nlData.filters.max_budget) params.set("max_budget", nlData.filters.max_budget);
+          if (nlData.filters.radius_km) params.set("radius_km", nlData.filters.radius_km.toString());
+          if (nlData.filters.min_budget) params.set("min_budget", nlData.filters.min_budget.toString());
+          if (nlData.filters.max_budget) params.set("max_budget", nlData.filters.max_budget.toString());
           if (nlData.filters.facilities) params.set("facilities", nlData.filters.facilities);
+          if (nlData.filters.sort_by) {
+            setSort(nlData.filters.sort_by as SortKey);
+          }
           if (Array.isArray(nlData.filters.fallback_cities)) {
             fallbackCities = nlData.filters.fallback_cities;
           }
@@ -143,8 +150,13 @@ function SearchResultsInner() {
           return a.costMin - b.costMin;
         });
       case "distance":
-        // No distance_km in new schema; fall back to city/address alphabetical
         return arr.sort((a, b) => {
+          if (a.distance_km != null && b.distance_km != null) {
+            return a.distance_km - b.distance_km;
+          }
+          if (a.distance_km != null) return -1;
+          if (b.distance_km != null) return 1;
+
           const locA = a.city ?? a.address ?? "";
           const locB = b.city ?? b.address ?? "";
           return locA.localeCompare(locB);
@@ -183,7 +195,12 @@ function SearchResultsInner() {
     setSelectedIds((prev) => prev.filter((x) => x !== id));
   };
 
-  const handleEditSearch = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleEditSearch = () => {
+    setShowManualFilters(!showManualFilters);
+    if (!showManualFilters) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const resultCount = sortedHospitals.length;
   const showEmpty = !isLoading && !error && resultCount === 0;
@@ -207,7 +224,12 @@ function SearchResultsInner() {
           <ExplainabilityPanel onEditSearch={handleEditSearch} explanation={explanation} />
         </section>
 
-        {/* Manual filters now live in the Hero section on the home page */}
+        {/* ── MANUAL FILTERS TOGGLE ── */}
+        {showManualFilters && (
+          <section className="mb-6" aria-label="Manual Filters">
+            <ManualFilters />
+          </section>
+        )}
 
         {/* ── 2. RESULTS TOOLBAR ── */}
         {!isLoading && !error && (

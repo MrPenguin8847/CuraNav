@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, Star, Users, Building2, Shield, Loader2, Filter, IndianRupee, Stethoscope } from "lucide-react";
+import { Search, MapPin, Star, Users, Building2, Shield, Loader2, Filter, IndianRupee, Stethoscope, Pill, Activity, Info } from "lucide-react";
+import { getEstimatedCost } from "@/lib/costEstimator";
 
 interface HeroSearchProps {
   query: string;
@@ -18,8 +19,38 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
   // Manual filter state
   const [showFilters, setShowFilters] = useState(false);
   const [city, setCity] = useState("");
+  const [condition, setCondition] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
+  const [facilities, setFacilities] = useState({
+    ICU: false,
+    Emergency: false,
+    Dialysis: false,
+    NICU: false,
+  });
+
+  const suggestedCost = specialty ? getEstimatedCost(specialty) : null;
+
+  useEffect(() => {
+    const q = condition.toLowerCase();
+    if (!q) return;
+    if (q.includes("heart") || q.includes("cardiac") || q.includes("cardio")) setSpecialty("Cardiology");
+    else if (q.includes("kidney") || q.includes("dialysis") || q.includes("renal")) setSpecialty("Nephrology");
+    else if (q.includes("cancer") || q.includes("tumor") || q.includes("oncol") || q.includes("chemo")) setSpecialty("Oncology");
+    else if (q.includes("bone") || q.includes("joint") || q.includes("ortho") || q.includes("fracture")) setSpecialty("Orthopedics");
+    else if (q.includes("brain") || q.includes("neuro") || q.includes("stroke") || q.includes("nerve")) setSpecialty("Neurology");
+    else if (q.includes("child") || q.includes("pediatric") || q.includes("baby") || q.includes("infant")) setSpecialty("Pediatrics");
+    else if (q.includes("eye") || q.includes("vision") || q.includes("cataract") || q.includes("opthal")) setSpecialty("Ophthalmology");
+    else if (q.includes("skin") || q.includes("derma") || q.includes("acne")) setSpecialty("Dermatology");
+    else if (q.includes("tooth") || q.includes("teeth") || q.includes("dental") || q.includes("dentist")) setSpecialty("Dentistry");
+    else if (q.includes("stomach") || q.includes("digest") || q.includes("gastro")) setSpecialty("Gastroenterology");
+    else if (q.includes("lung") || q.includes("breath") || q.includes("asthma") || q.includes("pulmo")) setSpecialty("Pulmonology");
+    else if (q.includes("women") || q.includes("pregnan") || q.includes("matern") || q.includes("gyne")) setSpecialty("Gynecology");
+  }, [condition]);
+
+  const handleFacilityChange = (fac: keyof typeof facilities) => {
+    setFacilities(prev => ({ ...prev, [fac]: !prev[fac] }));
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -34,9 +65,18 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
   const handleFilterSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
-    if (city) params.set("city", city);
-    if (specialty) params.set("condition", specialty);
-    if (maxBudget) params.set("max_budget", maxBudget);
+    if (city.trim()) params.set("city", city.trim());
+    if (condition.trim()) params.set("condition", condition.trim());
+    if (specialty.trim()) params.set("specialty", specialty.trim());
+    if (maxBudget.trim()) params.set("max_budget", maxBudget.trim());
+
+    const selectedFacilities = Object.entries(facilities)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([fac]) => fac);
+    if (selectedFacilities.length > 0) {
+      params.set("facilities", selectedFacilities.join(","));
+    }
+
     router.push(`/search?${params.toString()}`);
   };
 
@@ -201,35 +241,47 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
             {showFilters && (
               <form
                 onSubmit={handleFilterSearch}
-                className="bg-slate-50/80 backdrop-blur-sm border border-slate-200 rounded-2xl p-4 mb-4 animate-fade-in"
+                className="bg-slate-50/80 backdrop-blur-sm border border-slate-200 rounded-2xl p-5 mb-4 animate-fade-in space-y-5"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      <MapPin className="w-3 h-3" /> City
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <MapPin className="w-3 h-3" /> City / Location
                     </label>
                     <input
                       type="text"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      placeholder="e.g. Chandigarh"
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      placeholder="e.g. Pune, Delhi"
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     />
                   </div>
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      <Stethoscope className="w-3 h-3" /> Specialty
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <Pill className="w-3 h-3" /> Disease / Condition
+                    </label>
+                    <input
+                      type="text"
+                      value={condition}
+                      onChange={(e) => setCondition(e.target.value)}
+                      placeholder="e.g. Heart attack, Kidney failure"
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <Stethoscope className="w-3 h-3" /> Specialty (Auto-detected)
                     </label>
                     <input
                       type="text"
                       value={specialty}
                       onChange={(e) => setSpecialty(e.target.value)}
                       placeholder="e.g. Cardiology"
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     />
                   </div>
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       <IndianRupee className="w-3 h-3" /> Max Budget (₹)
                     </label>
                     <input
@@ -237,21 +289,57 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                       value={maxBudget}
                       onChange={(e) => setMaxBudget(e.target.value)}
                       placeholder="e.g. 500000"
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     />
+                    {suggestedCost && (
+                      <div className="mt-1.5 p-2 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-blue-800 leading-tight">
+                          Estimated: <strong>₹{suggestedCost.min.toLocaleString('en-IN')} – ₹{suggestedCost.max.toLocaleString('en-IN')}</strong> for {specialty}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
+
+                {/* Required Facilities */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <Activity className="w-3 h-3" /> Required Facilities
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.keys(facilities).map((fac) => (
+                      <label
+                        key={fac}
+                        className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-all text-sm ${
+                          facilities[fac as keyof typeof facilities]
+                            ? "bg-primary/10 border-primary text-primary font-semibold"
+                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={facilities[fac as keyof typeof facilities]}
+                          onChange={() => handleFacilityChange(fac as keyof typeof facilities)}
+                        />
+                        {fac}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => { setCity(""); setSpecialty(""); setMaxBudget(""); }}
-                    className="px-4 py-2 border border-slate-200 text-slate-500 rounded-lg text-xs font-semibold hover:bg-white transition-colors"
+                    onClick={() => { setCity(""); setCondition(""); setSpecialty(""); setMaxBudget(""); setFacilities({ ICU: false, Emergency: false, Dialysis: false, NICU: false }); }}
+                    className="px-4 py-2.5 border border-slate-200 text-slate-500 rounded-xl text-xs font-semibold hover:bg-white transition-colors"
                   >
                     Clear
                   </button>
                   <button
                     type="submit"
-                    className="flex-grow flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
+                    className="flex-grow flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/90 shadow-md shadow-primary/20 transition-all"
                   >
                     <Search className="w-4 h-4" />
                     Search with Filters
@@ -260,19 +348,7 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
               </form>
             )}
 
-            {/* Quick Links */}
-            <div className="flex flex-wrap gap-2">
-              {quickLinks.map((link) => (
-                <button
-                  key={link}
-                  type="button"
-                  onClick={() => setQuery(link + " hospitals near me")}
-                  className="px-3.5 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-500 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all duration-200"
-                >
-                  {link}
-                </button>
-              ))}
-            </div>
+
           </div>
 
           {/* Right: Image Collage */}

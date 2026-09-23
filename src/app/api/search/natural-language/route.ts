@@ -64,8 +64,11 @@ function validateResponseSchema(data: any): any {
   const condition = f.condition ?? null;
   const specialty = f.specialty ?? null;
   const city = f.city ?? null;
+  const radius_km = typeof f.radius_km === "number" ? f.radius_km : null;
+  const min_budget = typeof f.min_budget === "number" ? f.min_budget : null;
   const max_budget = typeof f.max_budget === "number" ? f.max_budget : null;
   const facilities = f.facilities ?? null;
+  const sort_by = typeof f.sort_by === "string" ? f.sort_by : null;
   const fallback_cities = Array.isArray(f.fallback_cities) ? f.fallback_cities : null;
 
   // Validate chips
@@ -79,7 +82,7 @@ function validateResponseSchema(data: any): any {
   }
 
   return {
-    filters: { condition, specialty, city, fallback_cities, max_budget, facilities },
+    filters: { condition, specialty, city, radius_km, fallback_cities, min_budget, max_budget, facilities, sort_by },
     chips
   };
 }
@@ -96,13 +99,16 @@ REQUIREMENTS:
 4. Use exactly \`null\` when information is not specified.
 
 Extract:
-- condition: the medical condition (e.g. "kidney disease", "heart disease", "cancer"). Null if none.
-- specialty: the corresponding medical specialty (e.g. "Nephrology", "Cardiology", "Oncology"). Null if none.
-- city: the city mentioned. Null if none.
-- fallback_cities: an array of 2-3 nearby major cities or districts geographically close to 'city'. Important if 'city' is a small town/village. Empty array if none.
-- max_budget: the maximum budget in Indian Rupees (INR) as an integer. Parse "under 2 lakh" as 200000, "under 50k" as 50000. Null if none.
+- condition: the medical condition or disease (e.g. "kidney disease", "heart disease", "cancer"). Null if none.
+- specialty: the corresponding medical specialty or procedure (e.g. "Nephrology", "Cardiology", "kidney transplant"). Null if none.
+- city: the city mentioned (e.g. "Chandigarh"). Null if none.
+- radius_km: the explicit distance radius in kilometers (e.g. "within 20 km" -> 20). Null if no explicit radius. Do not invent a radius for "near me".
+- fallback_cities: an array of 2-3 nearby major cities or districts geographically close to 'city'. Empty array if none.
+- min_budget: the minimum budget in Indian Rupees (INR) as an integer (e.g. "between 1 and 3 lakh" -> 100000). Null if none.
+- max_budget: the maximum budget in INR as an integer (e.g. "under 2 lakh" -> 200000). Null if none.
 - facilities: comma separated list of facilities (e.g. "Dialysis,ICU"). Null if none.
-- chips: an array of UI chips summarizing what was extracted. Each chip has { "icon", "label", "value" }. Use emojis: 🩺 Condition, ⚕️ Specialty, 📍 Location, 💰 Budget, 🏥 Facilities. Always end with { "icon": "🎯", "label": "Priority", "value": "Best match" }.
+- sort_by: sorting preference based on user language. Must be one of: "match", "cost" (for cheapest/affordable), "distance" (for closest/nearest), or "verified". Default is "match".
+- chips: an array of UI chips summarizing what was extracted. Each chip has { "icon", "label", "value" }. Use emojis: 🩺 Condition, 📍 Location, 📏 Distance (if radius_km), 💰 Budget, 🏥 Facilities, 🎯 Priority (for sort_by).
 
 EXPECTED JSON SCHEMA:
 {
@@ -110,9 +116,12 @@ EXPECTED JSON SCHEMA:
     "condition": string | null,
     "specialty": string | null,
     "city": string | null,
+    "radius_km": number | null,
     "fallback_cities": string[],
+    "min_budget": number | null,
     "max_budget": number | null,
-    "facilities": string | null
+    "facilities": string | null,
+    "sort_by": string | null
   },
   "chips": [
     { "icon": string, "label": string, "value": string }
@@ -259,9 +268,12 @@ async function callGemini(ai: GoogleGenAI, query: string) {
           condition: { type: Type.STRING, nullable: true },
           specialty: { type: Type.STRING, nullable: true },
           city: { type: Type.STRING, nullable: true },
+          radius_km: { type: Type.INTEGER, nullable: true },
           fallback_cities: { type: Type.ARRAY, items: { type: Type.STRING } },
+          min_budget: { type: Type.INTEGER, nullable: true },
           max_budget: { type: Type.INTEGER, nullable: true },
-          facilities: { type: Type.STRING, nullable: true }
+          facilities: { type: Type.STRING, nullable: true },
+          sort_by: { type: Type.STRING, nullable: true }
         }
       },
       chips: {
@@ -311,7 +323,9 @@ async function callGemini(ai: GoogleGenAI, query: string) {
 // ── Local fallback extraction (Regex) ─────────────────────────────────────────
 function localExtract(query: string) {
   const q = query.toLowerCase();
-  let condition: string | null = null, specialty: string | null = null, city: string | null = null, max_budget: number | null = null;
+  let condition: string | null = null, specialty: string | null = null, city: string | null = null;
+  let min_budget: number | null = null, max_budget: number | null = null, radius_km: number | null = null;
+  let sort_by: string | null = null;
   let facilities: string[] = [];
 
   if (q.includes("kidney") || q.includes("nephro") || q.includes("dialysis")) { condition = "kidney disease"; specialty = "Nephrology"; }
@@ -326,26 +340,48 @@ function localExtract(query: string) {
   const foundCity = cities.find((c) => q.includes(c));
   if (foundCity) city = foundCity.charAt(0).toUpperCase() + foundCity.slice(1);
 
-  const lakhMatch = q.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/i);
-  const kMatch = q.match(/(\d+(?:\.\d+)?)\s*k\b/i);
-  const exactMatch = q.match(/(?:under|below|max(?:imum)?)\s*(?:₹|rs\.?)?\s*(\d{4,})/i);
+  // Extract Radius
+  const radiusMatch = q.match(/within\s*(\d+)\s*km/i);
+  if (radiusMatch) radius_km = parseInt(radiusMatch[1], 10);
 
-  if (lakhMatch) max_budget = Math.round(parseFloat(lakhMatch[1]) * 100000);
-  else if (kMatch) max_budget = Math.round(parseFloat(kMatch[1]) * 1000);
-  else if (exactMatch) max_budget = parseInt(exactMatch[1], 10);
+  // Extract Budgets
+  const betweenMatch = q.match(/between\s*(?:₹|rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)?\s*and\s*(?:₹|rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/i);
+  if (betweenMatch) {
+    min_budget = Math.round(parseFloat(betweenMatch[1]) * 100000);
+    max_budget = Math.round(parseFloat(betweenMatch[2]) * 100000);
+  } else {
+    const lakhMatch = q.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/i);
+    const kMatch = q.match(/(\d+(?:\.\d+)?)\s*k\b/i);
+    const exactMatch = q.match(/(?:under|below|max(?:imum)?)\s*(?:₹|rs\.?)?\s*(\d{4,})/i);
+
+    if (lakhMatch) max_budget = Math.round(parseFloat(lakhMatch[1]) * 100000);
+    else if (kMatch) max_budget = Math.round(parseFloat(kMatch[1]) * 1000);
+    else if (exactMatch) max_budget = parseInt(exactMatch[1], 10);
+  }
 
   if (q.includes("dialysis")) facilities.push("Dialysis");
   if (q.includes("icu") || q.includes("emergency")) facilities.push("ICU");
+
+  // Extract Sort By
+  if (q.includes("closest") || q.includes("nearest") || q.includes("prioritize distance")) sort_by = "distance";
+  else if (q.includes("cheapest") || q.includes("affordable") || q.includes("prioritize cost")) sort_by = "cost";
 
   const chips = [];
   if (condition) chips.push({ icon: "🩺", label: "Condition", value: condition });
   if (specialty) chips.push({ icon: "⚕️", label: "Specialty", value: specialty });
   if (city) chips.push({ icon: "📍", label: "Location", value: city });
-  if (max_budget) chips.push({ icon: "💰", label: "Budget", value: `Under ₹${max_budget}` });
+  if (radius_km) chips.push({ icon: "📏", label: "Distance", value: `Within ${radius_km} km` });
+  
+  if (min_budget && max_budget) chips.push({ icon: "💰", label: "Budget", value: `₹${min_budget} - ₹${max_budget}` });
+  else if (max_budget) chips.push({ icon: "💰", label: "Budget", value: `Under ₹${max_budget}` });
+  
   if (facilities.length > 0) chips.push({ icon: "🏥", label: "Facilities", value: facilities.join(", ") });
-  chips.push({ icon: "🎯", label: "Priority", value: "Best match" });
+  
+  if (sort_by === "distance") chips.push({ icon: "🎯", label: "Priority", value: "Distance" });
+  else if (sort_by === "cost") chips.push({ icon: "🎯", label: "Priority", value: "Cost" });
+  else chips.push({ icon: "🎯", label: "Priority", value: "Best match" });
 
-  return { filters: { condition, specialty, city, fallback_cities: [], max_budget, facilities: facilities.length > 0 ? facilities.join(",") : null }, chips };
+  return { filters: { condition, specialty, city, radius_km, fallback_cities: [], min_budget, max_budget, facilities: facilities.length > 0 ? facilities.join(",") : null, sort_by }, chips };
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
