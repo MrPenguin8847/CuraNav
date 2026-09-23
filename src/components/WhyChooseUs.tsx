@@ -3,30 +3,30 @@ import { ShieldCheck, Cpu, ClipboardCheck, BarChart3 } from "lucide-react";
 const features = [
   {
     icon: ShieldCheck,
-    title: "Transparent Data",
+    title: "Source-Labeled Data",
     description:
-      "Every data point is labeled by source and verification status — you always know what's confirmed and what's estimated.",
+      "Every hospital record includes its source (NHA, self-reported, or synthetic) and verification status — no hidden data.",
     color: "text-emerald-600 bg-emerald-50",
   },
   {
     icon: Cpu,
     title: "AI-Powered Search",
     description:
-      "Our AI understands plain-language queries to extract your intent and surface the best hospital matches instantly.",
+      "Our AI extracts intent from plain-language queries — mapping your words to specialties, budget filters, and location automatically.",
     color: "text-primary bg-primary/10",
   },
   {
     icon: ClipboardCheck,
-    title: "Verified Hospitals",
+    title: "PM-JAY Empanelled",
     description:
-      "We verify hospital information including facilities, specialties, and accreditation to ensure accurate results.",
+      "All hospitals in our index are sourced from NHA's Health Empanelment Module — real PM-JAY empanelled facilities with verified data.",
     color: "text-blue-600 bg-blue-50",
   },
   {
     icon: BarChart3,
-    title: "Easy Comparison",
+    title: "Cost & Outcome Comparison",
     description:
-      "Compare hospitals side-by-side on cost, distance, facilities, and ratings to make confident decisions.",
+      "Compare hospitals side-by-side on private vs PM-JAY costs, procedure volumes, outcome metrics, and accreditations.",
     color: "text-amber-600 bg-amber-50",
   },
 ];
@@ -46,8 +46,8 @@ export function WhyChooseUs() {
               <span className="gradient-text">CuraNav</span>
             </h2>
             <p className="text-slate-500 mb-10 max-w-lg">
-              Built on responsible AI principles, CuraNav puts transparency and
-              trust at the center of your healthcare decision-making.
+              Built on responsible AI principles with real NHA/PM-JAY data, CuraNav
+              puts transparency and trust at the center of healthcare discovery.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -84,8 +84,8 @@ export function WhyChooseUs() {
                     Responsible AI
                   </h3>
                   <p className="text-sm text-slate-500">
-                    No diagnosis. No treatment advice. Just transparent
-                    information.
+                    No diagnosis. No treatment advice. Just transparent, verified
+                    hospital data.
                   </p>
                 </div>
               </div>

@@ -4,23 +4,23 @@ const steps = [
   {
     number: 1,
     icon: MessageSquareText,
-    heading: "Describe Your Needs",
+    heading: "Describe Your Need",
     description:
-      "Type one plain-language sentence — no medical jargon or category navigation required. Our AI understands you.",
+      "Type a plain-language sentence like 'I need heart surgery in Chandigarh under ₹2 lakh' — our AI understands your intent without medical jargon.",
   },
   {
     number: 2,
     icon: SlidersHorizontal,
-    heading: "See Transparent Matches",
+    heading: "See Real Matches",
     description:
-      "AI extracts your filters and shows matching hospitals, with each data point labeled by source and verification status.",
+      "AI extracts your specialty, budget, and location filters, then queries our PM-JAY hospital index. Each result shows its data source and verification status.",
   },
   {
     number: 3,
     icon: GitCompare,
     heading: "Compare & Decide",
     description:
-      "Side-by-side comparison of cost, facilities, and distance — with clear labels distinguishing confirmed data from estimates.",
+      "Side-by-side comparison of private vs PM-JAY costs, procedure volumes, outcome metrics, and accreditations — all sourced from NHA data.",
   },
 ];
 
@@ -37,7 +37,7 @@ export function HowItWorks() {
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto">
             From a single sentence to a confident, informed decision — in three
-            simple steps.
+            steps, backed by real government healthcare data.
           </p>
         </div>
 

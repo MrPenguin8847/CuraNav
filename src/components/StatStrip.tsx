@@ -1,38 +1,43 @@
-import { Building2, Stethoscope, CheckCircle, Sparkles } from "lucide-react";
+"use client";
 
-const stats = [
-  {
-    icon: Building2,
-    value: "25+",
-    label: "Hospitals Listed",
-    color: "text-primary bg-primary/10",
-  },
-  {
-    icon: Stethoscope,
-    value: "50+",
-    label: "Expert Doctors",
-    color: "text-blue-600 bg-blue-100",
-  },
-  {
-    icon: CheckCircle,
-    value: "100%",
-    label: "Transparent Data",
-    color: "text-green-600 bg-green-100",
-  },
-  {
-    icon: Sparkles,
-    value: "AI",
-    label: "Powered Search",
-    color: "text-amber-600 bg-amber-100",
-  },
-];
+import { Building2, Stethoscope, ShieldCheck, Sparkles } from "lucide-react";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 export function StatStrip() {
+  const { stats, loading } = usePlatformStats();
+
+  const items = [
+    {
+      icon: Building2,
+      value: loading ? "..." : `${stats.totalHospitals}`,
+      label: "Hospitals Indexed",
+      color: "text-primary bg-primary/10",
+    },
+    {
+      icon: Stethoscope,
+      value: loading ? "..." : `${stats.totalSpecialties}`,
+      label: "Specialties Covered",
+      color: "text-blue-600 bg-blue-100",
+    },
+    {
+      icon: ShieldCheck,
+      value: loading ? "..." : `${stats.pmjayEmpanelled}`,
+      label: "PM-JAY Empanelled",
+      color: "text-green-600 bg-green-100",
+    },
+    {
+      icon: Sparkles,
+      value: "AI",
+      label: "Powered Search",
+      color: "text-amber-600 bg-amber-100",
+    },
+  ];
+
   return (
     <section className="py-6 bg-white border-y border-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map(({ icon: Icon, value, label, color }) => (
+          {items.map(({ icon: Icon, value, label, color }) => (
             <div
               key={label}
               className="flex items-center gap-4 py-4"

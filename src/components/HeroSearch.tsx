@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, Star, Users, Building2, Shield, Loader2, Filter, IndianRupee, Stethoscope, Pill, Activity, Info } from "lucide-react";
+import { Search, MapPin, Building2, Shield, Loader2, Filter, IndianRupee, Stethoscope, Pill, Activity, Info, Database, HeartPulse } from "lucide-react";
 import { getEstimatedCost } from "@/lib/costEstimator";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 interface HeroSearchProps {
   query: string;
@@ -12,6 +13,7 @@ interface HeroSearchProps {
 
 export function HeroSearch({ query, setQuery }: HeroSearchProps) {
   const router = useRouter();
+  const { stats, loading: statsLoading } = usePlatformStats();
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
@@ -131,11 +133,11 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
 
   const quickLinks = [
     "Cardiology",
-    "Neurology",
-    "Orthopedics",
-    "Oncology",
-    "Pediatrics",
-    "Nephrology",
+    "General Surgery",
+    "Orthopaedics",
+    "Emergency",
+    "Burns",
+    "Kidney & Dialysis",
   ];
 
   return (
@@ -151,19 +153,17 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 rounded-full mb-6">
               <Shield className="w-4 h-4 text-primary" />
               <span className="text-xs font-semibold text-primary uppercase tracking-wider">
-                Trusted Healthcare Platform
+                AI-Powered Hospital Discovery
               </span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-foreground leading-[1.1] tracking-tight mb-6">
-              Your Health{" "}
-              <span className="gradient-text">Expertly Managed</span>
+              Find the Right{" "}
+              <span className="gradient-text">Hospital</span> for You
             </h1>
 
             <p className="text-lg text-slate-500 leading-relaxed max-w-lg mb-8">
-              Find, compare, and navigate trusted hospitals and treatments
-              tailored to your specific needs, budget, and location — powered by
-              transparent AI.
+              Search {stats.totalHospitals > 0 ? `${stats.totalHospitals} PM-JAY empanelled hospitals` : 'hospitals'} across {stats.totalSpecialties > 0 ? `${stats.totalSpecialties} specialties` : 'specialties'}. Compare costs, outcomes, and certifications — powered by transparent AI.
             </p>
 
             {/* Search Bar */}
@@ -361,21 +361,23 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                   <div className="w-24 h-24 mx-auto rounded-full bg-white shadow-lg flex items-center justify-center mb-6">
                     <Building2 className="w-12 h-12 text-primary" />
                   </div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">Premium Healthcare</h3>
-                  <p className="text-sm text-slate-500">Compare 25+ hospitals across India</p>
+                  <h3 className="text-xl font-bold text-foreground mb-2">PM-JAY Hospital Index</h3>
+                  <p className="text-sm text-slate-500">
+                    {statsLoading ? "Loading..." : `${stats.totalHospitals} hospitals · ${stats.totalSpecialties} specialties`}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Floating stats cards */}
+            {/* Floating stats cards — all live from DB */}
             <div className="absolute -left-6 top-8 bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-4 border border-slate-100 animate-float">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-green-600" />
+                  <Database className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-foreground">1000+</p>
-                  <p className="text-xs text-slate-500">Happy Patients</p>
+                  <p className="text-lg font-bold text-foreground">{statsLoading ? "..." : stats.withCostData}</p>
+                  <p className="text-xs text-slate-500">With Cost Data</p>
                 </div>
               </div>
             </div>
@@ -383,19 +385,21 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
             <div className="absolute -right-4 bottom-12 bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-4 border border-slate-100 animate-float" style={{ animationDelay: "2s" }}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Star className="w-5 h-5 text-amber-500" />
+                  <HeartPulse className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-foreground">4.8/5</p>
-                  <p className="text-xs text-slate-500">User Rating</p>
+                  <p className="text-lg font-bold text-foreground">{statsLoading ? "..." : stats.pmjayEmpanelled}</p>
+                  <p className="text-xs text-slate-500">PM-JAY Listed</p>
                 </div>
               </div>
             </div>
 
             <div className="absolute left-1/2 -translate-x-1/2 -bottom-4 bg-white rounded-2xl shadow-xl shadow-slate-200/60 px-5 py-3 border border-slate-100 animate-float" style={{ animationDelay: "4s" }}>
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-foreground">Available across 10+ cities</span>
+                <Stethoscope className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-foreground">
+                  {statsLoading ? "Loading specialties..." : `${stats.totalSpecialties} medical specialties indexed`}
+                </span>
               </div>
             </div>
           </div>

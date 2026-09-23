@@ -39,7 +39,8 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed mb-6 max-w-sm">
-              CuraNav helps you discover and compare hospitals with transparent, AI-powered search.
+              CuraNav helps you discover and compare PM-JAY empanelled hospitals using
+              transparent, AI-powered search backed by NHA data.
               We don&apos;t diagnose or recommend — we inform.
             </p>
             <div className="space-y-3">

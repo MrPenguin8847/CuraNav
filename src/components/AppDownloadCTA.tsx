@@ -13,12 +13,13 @@ export function AppDownloadCTA() {
           {/* Left: Text */}
           <div>
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 leading-tight">
-              Make Smarter Healthcare Decisions with{" "}
+              Start Making Informed Healthcare Decisions with{" "}
               <span className="text-primary-light">CuraNav</span>
             </h2>
             <p className="text-lg text-white/70 mb-8 max-w-lg leading-relaxed">
-              Search hospitals, compare costs, and navigate treatments — all in one
-              place. Powered by transparent AI that respects your autonomy.
+              Search PM-JAY empanelled hospitals, compare costs and outcomes, and
+              discover the right care for your needs — all powered by transparent,
+              responsible AI.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">

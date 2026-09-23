@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CuraNav — Find, Compare & Navigate Healthcare",
+  title: "CuraNav — AI-Powered PM-JAY Hospital Discovery",
   description:
-    "Discover trusted hospitals, compare costs and facilities, and navigate healthcare decisions with transparent AI-powered search.",
+    "Search, compare, and navigate PM-JAY empanelled hospitals across India. Compare costs, outcomes, and certifications — powered by transparent AI. Built for TECHNOVA 2026.",
 };
 
 import { Chatbot } from "@/components/Chatbot";

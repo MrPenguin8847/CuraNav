@@ -7,17 +7,17 @@ const faqs = [
   {
     question: "What is CuraNav?",
     answer:
-      "CuraNav is a transparent healthcare platform that helps you find, compare, and navigate hospitals and treatments based on your specific needs, budget, and location. Our AI-powered search understands plain-language queries to surface the best matches.",
+      "CuraNav is a transparent healthcare discovery platform that helps you search, compare, and navigate PM-JAY empanelled hospitals. Our AI-powered search understands plain-language queries and matches you with hospitals based on specialty, budget, and location — all backed by data from the National Health Authority.",
   },
   {
     question: "Is CuraNav free to use?",
     answer:
-      "Yes, CuraNav is completely free for patients and caregivers. We believe everyone deserves access to transparent healthcare information to make informed decisions.",
+      "Yes. CuraNav is completely free for patients and caregivers. It is a prototype built for TECHNOVA 2026 under the Responsible AI theme, designed to demonstrate how transparent healthcare information systems should work.",
   },
   {
-    question: "How does CuraNav verify hospital data?",
+    question: "Where does CuraNav get its hospital data?",
     answer:
-      "Every data point on CuraNav is labeled by source and verification status. We cross-reference hospital information with official accreditation bodies, government databases, and direct hospital submissions. Data that hasn't been independently verified is clearly marked as estimated.",
+      "Our hospital index is sourced from the NHA Health Empanelment Module (hem.nha.gov.in) — the official PM-JAY hospital database. Every record includes its source type and verification status so you always know what's confirmed vs. estimated.",
   },
   {
     question: "Does CuraNav provide medical advice?",
@@ -25,14 +25,14 @@ const faqs = [
       "No. CuraNav is an information platform, not a medical service. We help you discover and compare hospitals — we do not diagnose conditions or recommend treatments. Always consult qualified medical professionals for health decisions.",
   },
   {
-    question: "What cities does CuraNav cover?",
+    question: "What hospitals and specialties does CuraNav cover?",
     answer:
-      "CuraNav currently covers hospitals across 10+ major Indian cities including Delhi, Mumbai, Bangalore, Chandigarh, Hyderabad, and more. We're continuously expanding our coverage.",
+      "CuraNav currently indexes PM-JAY empanelled hospitals with data across multiple specialties including Cardiology, Orthopedics, Oncology, Neurosurgery, Ophthalmology, and more. The exact count updates automatically as we expand our database.",
   },
   {
     question: "How does the AI search work?",
     answer:
-      "Our AI parses your natural-language query to extract intent, location, budget, specialty, and facility requirements. It then matches these parameters against our hospital database to surface the most relevant results — all transparently, with no hidden ranking factors.",
+      "Our AI parses your natural-language query to extract intent — specialty, budget, city, and required facilities. It then matches these parameters against our live hospital database. If AI providers are unavailable, a robust local fallback extracts filters using keyword matching.",
   },
 ];
 
