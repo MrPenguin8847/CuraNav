@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, Menu, X } from "lucide-react";
+import { Activity, Menu, X, Siren } from "lucide-react";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -43,6 +43,13 @@ export function Header() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
+          <Link
+            href="/emergency"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-error px-3 py-2 rounded-lg hover:bg-error/10 transition-colors"
+          >
+            <Siren className="w-4 h-4" />
+            Emergency
+          </Link>
           <Link href="/admin" className="btn-primary text-sm py-2">
             Admin Log In
           </Link>
@@ -68,6 +75,14 @@ export function Header() {
             <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>About Us</Link>
             <Link href="/#faq" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>FAQ</Link>
             <hr className="border-white/10" />
+            <Link
+              href="/emergency"
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-error py-2"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Siren className="w-4 h-4" />
+              Emergency
+            </Link>
             <Link href="/admin" className="btn-primary text-sm text-center" onClick={() => setMobileOpen(false)}>Admin Log In</Link>
           </div>
         </div>

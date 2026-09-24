@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 };
 
 import { Chatbot } from "@/components/Chatbot";
+import { EmergencyGate } from "@/components/EmergencyGate";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
         <Chatbot />
+        <EmergencyGate />
       </body>
     </html>
   );
