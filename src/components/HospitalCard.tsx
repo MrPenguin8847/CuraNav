@@ -151,7 +151,7 @@ export function HospitalCard({
         });
 
         // Add success rate chip for the matched specialty
-        if (successRates && successRates[matchedSpec]) {
+        if (successRates && typeof successRates[matchedSpec] === "number" && successRates[matchedSpec] > 0) {
           explainChips.push({
             icon: <TrendingUp className="w-3.5 h-3.5" />,
             label: "Success Rate",
@@ -169,7 +169,7 @@ export function HospitalCard({
         });
         
         // Show success rate for the matchingSpecialty if available
-        if (successRates && successRates[matchingSpecialty]) {
+        if (successRates && typeof successRates[matchingSpecialty] === "number" && successRates[matchingSpecialty] > 0) {
           explainChips.push({
             icon: <TrendingUp className="w-3.5 h-3.5" />,
             label: "Success Rate",
@@ -309,7 +309,7 @@ export function HospitalCard({
 
     // Show best available success rate even with no filters
     if (successRates) {
-      const entries = Object.entries(successRates);
+      const entries = Object.entries(successRates).filter(([, v]) => typeof v === "number" && v > 0);
       if (entries.length > 0) {
         const [bestSpec, bestRate] = entries.reduce((best, curr) => curr[1] > best[1] ? curr : best);
         explainChips.push({
@@ -329,7 +329,7 @@ export function HospitalCard({
     // Try to find a rate for any of the hospital's specialties
     const matchEntry = specialties
       .map(s => [s, successRates[s]] as [string, number])
-      .find(([, rate]) => rate != null && rate > 0);
+      .find(([, rate]) => typeof rate === "number" && rate > 0);
     if (matchEntry) {
       explainChips.push({
         icon: <TrendingUp className="w-3.5 h-3.5" />,
@@ -339,7 +339,7 @@ export function HospitalCard({
       });
     } else {
       // Fallback: use any key in successRates
-      const anyEntry = Object.entries(successRates).find(([, v]) => v > 0);
+      const anyEntry = Object.entries(successRates).find(([, v]) => typeof v === "number" && v > 0);
       if (anyEntry) {
         explainChips.push({
           icon: <TrendingUp className="w-3.5 h-3.5" />,

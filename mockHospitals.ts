@@ -932,7 +932,7 @@ export const mockHospitals: Hospital[] = [
     phone: "7978580730",
     facilityType: "Hospital",
     dateOfEstablishment: "29-10-2024",
-    successRates: {}
+    successRates: {"General Medicine":86}
   },
   {
     hospitalId: "HOSP21P110110",
@@ -965,7 +965,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9438512226",
     facilityType: "Hospital",
     dateOfEstablishment: "29-10-2024",
-    successRates: {}
+    successRates: {"General Medicine":87}
   },
   {
     hospitalId: "HOSP21P110112",
@@ -1196,7 +1196,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9814641432",
     facilityType: "Hospital",
     dateOfEstablishment: "16-05-1996",
-    successRates: {}
+    successRates: {"General Medicine":90}
   },
   {
     hospitalId: "HOSP3P25105740",
@@ -2054,7 +2054,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9815197135",
     facilityType: "Hospital",
     dateOfEstablishment: "10-01-1999",
-    successRates: {}
+    successRates: {"General Medicine":92}
   },
   {
     hospitalId: "HOSP3P26150662",
@@ -2219,7 +2219,7 @@ export const mockHospitals: Hospital[] = [
     phone: "9814218688",
     facilityType: "Hospital",
     dateOfEstablishment: "01-01-1993",
-    successRates: {}
+    successRates: {"General Medicine":90}
   },
   {
     hospitalId: "HOSP3P130925",
