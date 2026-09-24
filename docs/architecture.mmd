@@ -1,0 +1,31 @@
+flowchart LR
+    subgraph Browser
+        UI[Next.js pages & components<br/>page.tsx / components/*]
+        G[Browser Geolocation]
+    end
+    subgraph NextJS[Next.js App (App Router)]
+        API[API routes<br/>src/app/api/**/route.ts]
+        MID[src/middleware.ts<br/>admin auth gate]
+        SVC[Server components<br/>e.g. hospital/[id]]
+        UL[userLocation.ts<br/>localStorage]
+    end
+    DB[(Supabase Postgres<br/>table: hospitals)]
+    AUTH[SupaAuth<br/>email+password]
+    subgraph AI[AI Providers]
+        GROQ[Groq]
+        OR[OpenRouter]
+        AIML[AIML API]
+        GEM[Gemini @google/genai]
+    end
+    NOM[Nominatim OSM<br/>geocoding]
+
+    UI --> API
+    UI --> MID
+    MID --> AUTH
+    SVC --> DB
+    API --> DB
+    API --> AUTH
+    API --> GROQ & OR & AIML & GEM
+    API --> NOM
+    G --> UI
+    UI --> UL

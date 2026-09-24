@@ -1,0 +1,31 @@
+erDiagram
+    hospitals {
+        text hospital_id PK
+        text name
+        text city
+        text state
+        text pincode
+        text address
+        double latitude
+        double longitude
+        text[] specialties
+        text[] procedures
+        int cost_min
+        int cost_max
+        text currency
+        text[] facilities
+        text[] accreditation
+        bool pmjay_empanelled
+        int annual_procedure_volume
+        text outcome_metric
+        int icu_beds
+        text source_type
+        text verification_status
+        text source_url
+        date last_verified
+        date last_updated
+        text data_status
+        text review_status
+        text condition_tag
+        jsonb success_rates
+    }

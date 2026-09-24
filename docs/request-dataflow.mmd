@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant U as User
+    participant P as Page (client)
+    participant M as Middleware
+    participant A as API route
+    participant S as Supabase
+    participant AI as AI providers (Groq/OR/AIML/Gemini)
+
+    Note over U,S: Natural-language search
+    U->>P: "heart bypass under ₹150k in Pune"
+    P->>A: POST /api/search/natural-language
+    A->>AI: waterfall until success
+    AI-->>A: {filters, chips}
+    A-->>P: JSON
+    P->>A: GET /api/hospitals?city=&specialty=&max_budget=
+    A->>S: select rows
+    S-->>A: hospitals
+    A-->>P: rows -> mapHospital() -> cards
+    Note over P: ExplainabilityPanel shows chips
+
+    Note over U,S: Emergency flow
+    U->>P: EmergencyGate -> /emergency
+    P->>P: geolocation.getCurrentPosition()
+    P->>A: GET /api/hospitals?specialty=Emergency Room Packages&radius_km=120&lat&lon
+    A->>S: select
+    S-->>P: sorted by distance -> top card
+
+    Note over U,S: Admin moderation
+    U->>M: GET /admin
+    M->>S: supabase.auth.getUser() (cookie)
+    M-->>U: redirect /admin/login if no user
+    U->>A: GET /api/hospitals?admin=true
+    U->>A: PATCH /api/hospitals/[id] {review_status}
