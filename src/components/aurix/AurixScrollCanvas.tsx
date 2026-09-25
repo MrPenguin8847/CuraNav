@@ -1,18 +1,30 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AurixHudOverlay } from "./AurixHudOverlay";
 
 const FRAME_COUNT = 300;
 const FRAME_START = 1;
+const STAGE_ONE_VIEWPORTS = 4;
+const HANDOFF_VIEWPORTS = 1;
 const ASSET_PATH = (frame: number) =>
   `/assets/aurix/ezgif-frame-${frame.toString().padStart(3, "0")}.jpg`;
 
-export function AurixScrollCanvas() {
+const clamp = (value: number) => Math.min(1, Math.max(0, value));
+
+type HandoffContent = (progress: number) => React.ReactNode;
+
+interface AurixScrollCanvasProps {
+  handoffContent?: HandoffContent;
+}
+
+export function AurixScrollCanvas({ handoffContent }: AurixScrollCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [progress, setProgress] = useState(0);
+  const [handoffProgress, setHandoffProgress] = useState(0);
   const [loadedFrames, setLoadedFrames] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const imagesRef = useRef<(HTMLImageElement | null)[]>(
     new Array(FRAME_COUNT + 1).fill(null)
   );
@@ -20,40 +32,46 @@ export function AurixScrollCanvas() {
   const currentFrame = useRef(1);
   const targetFrame = useRef(1);
   const animationFrameId = useRef<number | null>(null);
+  const renderLoopRunning = useRef(false);
   const lastDrawnFrame = useRef(-1);
 
-  // ── Preload frames ──────────────────────────────────────────────
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => setReducedMotion(mediaQuery.matches);
+    updateMotionPreference();
+    mediaQuery.addEventListener("change", updateMotionPreference);
+    return () => mediaQuery.removeEventListener("change", updateMotionPreference);
+  }, []);
+
   useEffect(() => {
     let isCancelled = false;
     let loaded = 0;
 
     const loadImage = (index: number): Promise<void> =>
       new Promise((resolve) => {
-        const img = new Image();
-        img.src = ASSET_PATH(index);
-        img.onload = () => {
+        const image = new Image();
+        image.src = ASSET_PATH(index);
+        image.onload = () => {
           if (!isCancelled) {
-            imagesRef.current[index] = img;
+            imagesRef.current[index] = image;
             loaded++;
             setLoadedFrames(loaded);
           }
           resolve();
         };
-        img.onerror = () => resolve();
+        image.onerror = () => resolve();
       });
 
     const preload = async () => {
-      // Eagerly load first 30 frames for instant start
       const eager: Promise<void>[] = [];
-      for (let i = FRAME_START; i <= Math.min(30, FRAME_COUNT); i++) {
-        eager.push(loadImage(i));
+      for (let index = FRAME_START; index <= Math.min(30, FRAME_COUNT); index++) {
+        eager.push(loadImage(index));
       }
       await Promise.all(eager);
 
-      // Load remaining in sequential order
-      for (let i = 31; i <= FRAME_COUNT; i++) {
+      for (let index = 31; index <= FRAME_COUNT; index++) {
         if (isCancelled) return;
-        await loadImage(i);
+        await loadImage(index);
       }
     };
 
@@ -63,118 +81,79 @@ export function AurixScrollCanvas() {
     };
   }, []);
 
-  // ── Draw a single frame onto the canvas ─────────────────────────
   const drawFrame = useCallback((frameIndex: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
 
-    // Skip if same frame already drawn
     if (lastDrawnFrame.current === frameIndex) return;
 
-    // Find closest loaded frame (look backward)
-    let img = imagesRef.current[frameIndex];
-    if (!img) {
-      for (let i = frameIndex - 1; i >= FRAME_START; i--) {
-        if (imagesRef.current[i]) {
-          img = imagesRef.current[i];
+    const exactImage = imagesRef.current[frameIndex];
+    let image = exactImage;
+    if (!image) {
+      for (let index = frameIndex - 1; index >= FRAME_START; index--) {
+        if (imagesRef.current[index]) {
+          image = imagesRef.current[index];
           break;
         }
       }
     }
 
-    // Size canvas buffer to match CSS size × devicePixelRatio
-    const dpr = window.devicePixelRatio || 1;
+    const devicePixelRatio = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
-    const bufW = Math.round(rect.width * dpr);
-    const bufH = Math.round(rect.height * dpr);
+    const bufferWidth = Math.round(rect.width * devicePixelRatio);
+    const bufferHeight = Math.round(rect.height * devicePixelRatio);
 
-    if (canvas.width !== bufW || canvas.height !== bufH) {
-      canvas.width = bufW;
-      canvas.height = bufH;
+    if (canvas.width !== bufferWidth || canvas.height !== bufferHeight) {
+      canvas.width = bufferWidth;
+      canvas.height = bufferHeight;
     }
 
-    // Reset transform then scale for DPR
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    context.fillStyle = "#000000";
+    context.fillRect(0, 0, rect.width, rect.height);
 
-    // Clear to black (matches frame backgrounds)
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, rect.width, rect.height);
-
-    if (img) {
-      // "contain" mode — fit entirely within viewport and anchor to bottom
-      const imgW = img.naturalWidth;
-      const imgH = img.naturalHeight;
-      const imgRatio = imgW / imgH;
+    if (image) {
+      const imageWidth = image.naturalWidth;
+      const imageHeight = image.naturalHeight;
+      const imageRatio = imageWidth / imageHeight;
       const canvasRatio = rect.width / rect.height;
 
-      let drawW: number, drawH: number, offsetX: number, offsetY: number;
+      let drawWidth: number;
+      let drawHeight: number;
+      let offsetX: number;
+      let offsetY: number;
 
-      if (canvasRatio > imgRatio) {
-        // Canvas is wider than image. Fit to height.
-        drawH = rect.height;
-        drawW = rect.height * imgRatio;
-        offsetX = (rect.width - drawW) / 2;
-        offsetY = 0; // Or (rect.height - drawH) which is 0 anyway
+      if (canvasRatio > imageRatio) {
+        drawHeight = rect.height;
+        drawWidth = rect.height * imageRatio;
+        offsetX = (rect.width - drawWidth) / 2;
+        offsetY = 0;
       } else {
-        // Canvas is taller than image. Fit to width.
-        drawW = rect.width;
-        drawH = rect.width / imgRatio;
+        drawWidth = rect.width;
+        drawHeight = rect.width / imageRatio;
         offsetX = 0;
-        // Anchor to bottom so it's not "stuck above"
-        offsetY = rect.height - drawH;
+        offsetY = rect.height - drawHeight;
       }
 
-      ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
-      
-      // Cover the baked-in Spline watermark in the bottom-right corner of the image
-      // The watermark is typically around 150x50 in the bottom right
-      const watermarkW = 160;
-      const watermarkH = 60;
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(
-        offsetX + drawW - watermarkW, 
-        offsetY + drawH - watermarkH, 
-        watermarkW, 
-        watermarkH
+      context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+      context.fillStyle = "#000000";
+      context.fillRect(
+        offsetX + drawWidth - 160,
+        offsetY + drawHeight - 60,
+        160,
+        60
       );
-
-      lastDrawnFrame.current = frameIndex;
+      lastDrawnFrame.current = exactImage ? frameIndex : -1;
     }
   }, []);
 
-  // ── Scroll tracking ─────────────────────────────────────────────
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!containerRef.current) return;
+  const requestRender = useCallback(() => {
+    if (renderLoopRunning.current) return;
 
-      const { top, height } = containerRef.current.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const maxScroll = height - vh;
-      const scrollPos = -top;
-
-      let p = 0;
-      if (scrollPos <= 0) p = 0;
-      else if (scrollPos >= maxScroll) p = 1;
-      else p = scrollPos / maxScroll;
-
-      setProgress(p);
-      targetFrame.current = Math.min(
-        FRAME_COUNT,
-        Math.max(FRAME_START, Math.floor(p * (FRAME_COUNT - 1)) + 1)
-      );
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // ── Render loop (lerp toward target frame) ──────────────────────
-  useEffect(() => {
     const tick = () => {
       currentFrame.current +=
         (targetFrame.current - currentFrame.current) * 0.12;
@@ -184,50 +163,135 @@ export function AurixScrollCanvas() {
       }
 
       drawFrame(Math.round(currentFrame.current));
+
+      if (
+        targetFrame.current >= FRAME_COUNT &&
+        currentFrame.current >= FRAME_COUNT
+      ) {
+        renderLoopRunning.current = false;
+        animationFrameId.current = null;
+        return;
+      }
+
       animationFrameId.current = requestAnimationFrame(tick);
     };
 
+    renderLoopRunning.current = true;
     animationFrameId.current = requestAnimationFrame(tick);
-    return () => {
-      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
-    };
   }, [drawFrame]);
 
-  // ── prefers-reduced-motion ──────────────────────────────────────
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const stageOneViewports = reducedMotion ? 1 : STAGE_ONE_VIEWPORTS;
+  const totalViewports = stageOneViewports + HANDOFF_VIEWPORTS;
+
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+    const handleScroll = () => {
+      if (!containerRef.current) return;
+
+      const { top } = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const stageOneHeight = viewportHeight * stageOneViewports;
+      const stageOneScrollRange = Math.max(stageOneHeight - viewportHeight, 0);
+      const handoffRange = viewportHeight * HANDOFF_VIEWPORTS;
+      const scrollPosition = Math.max(0, -top);
+      const modelProgress =
+        stageOneScrollRange === 0
+          ? 1
+          : clamp(scrollPosition / stageOneScrollRange);
+      const nextHandoffProgress =
+        handoffRange === 0
+          ? 0
+          : clamp((scrollPosition - stageOneScrollRange) / handoffRange);
+      const nextTargetFrame = Math.min(
+        FRAME_COUNT,
+        Math.max(FRAME_START, Math.floor(modelProgress * (FRAME_COUNT - 1)) + 1)
+      );
+
+      setProgress((currentProgress) =>
+        currentProgress === modelProgress ? currentProgress : modelProgress
+      );
+      setHandoffProgress((currentHandoffProgress) =>
+        currentHandoffProgress === nextHandoffProgress
+          ? currentHandoffProgress
+          : nextHandoffProgress
+      );
+
+      if (nextTargetFrame !== targetFrame.current) {
+        targetFrame.current = nextTargetFrame;
+        requestRender();
+      }
+    };
+
+    const handleResize = () => {
+      lastDrawnFrame.current = -1;
+      requestRender();
+      handleScroll();
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+    handleScroll();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [requestRender, stageOneViewports]);
+
+  useEffect(() => {
+    requestRender();
+    return () => {
+      renderLoopRunning.current = false;
+      if (animationFrameId.current !== null) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+    };
+  }, [requestRender]);
+
+  useEffect(() => {
+    if (imagesRef.current[targetFrame.current]) {
+      requestRender();
+    }
+  }, [loadedFrames, requestRender]);
+
+  const hudOpacity = Math.max(0, 1 - handoffProgress / 0.22);
 
   return (
-    <section className="bg-black w-full">
-      {/* Scroll runway — height defines how much scroll travel maps to 300 frames */}
+    <section className="relative bg-black w-full">
       <div
         ref={containerRef}
         className="relative w-full"
-        style={{ height: reducedMotion ? "100vh" : "400vh" }}
+        style={{ height: `${totalViewports * 100}vh` }}
       >
-        {/* Sticky viewport pinned to screen while container scrolls */}
-        <div className="sticky top-0 w-full h-screen overflow-hidden bg-black">
-          {/* Canvas — renders behind the HUD */}
+        <div className="sticky top-0 z-0 w-full h-screen overflow-hidden bg-black">
           <canvas
             ref={canvasRef}
             className="absolute inset-0 w-full h-full"
             style={{ zIndex: 1 }}
           />
-
-          {/* HUD Overlay — renders above the canvas */}
-          <div style={{ position: "relative", zIndex: 2, height: "100%" }}>
+          <div
+            style={{
+              position: "relative",
+              zIndex: 2,
+              height: "100%",
+              opacity: hudOpacity,
+              transition: "opacity 180ms ease",
+            }}
+          >
             <AurixHudOverlay
               progress={progress}
               loadedPercent={Math.round((loadedFrames / FRAME_COUNT) * 100)}
             />
           </div>
         </div>
+
+        {handoffContent && (
+          <div
+            className="absolute inset-x-0 z-10"
+            style={{ top: `${stageOneViewports * 100}vh` }}
+          >
+            {handoffContent(handoffProgress)}
+          </div>
+        )}
       </div>
     </section>
   );

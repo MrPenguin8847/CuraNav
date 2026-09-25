@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import {
   Heart,
   Brain,
@@ -14,6 +15,8 @@ import {
 
 interface BrowseByConditionProps {
   onSelect: (query: string) => void;
+  mode?: "full" | "handoff" | "remaining";
+  handoffProgress?: number;
 }
 
 const services = [
@@ -75,50 +78,133 @@ const services = [
   },
 ];
 
-export function BrowseByCondition({ onSelect }: BrowseByConditionProps) {
+const FIRST_ROW_LENGTH = 4;
+
+type Service = (typeof services)[number];
+
+function SpecialtyHeading({ className = "" }: { className?: string }) {
+  return (
+    <div className={`text-center ${className}`}>
+      <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest rounded-full mb-4">
+        Browse Specialties
+      </span>
+      <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+        Search by <span className="gradient-text text-gradient-brand">Medical Need</span>
+      </h2>
+      <p className="text-muted-foreground max-w-xl mx-auto">
+        Select a specialty to instantly search PM-JAY empanelled hospitals, compare
+        treatment costs, and view verified facility data.
+      </p>
+    </div>
+  );
+}
+
+function ServiceCard({
+  service,
+  onSelect,
+}: {
+  service: Service;
+  onSelect: (query: string) => void;
+}) {
+  const { icon: Icon, label, description, query, color } = service;
+
+  return (
+    <button
+      onClick={() => {
+        onSelect(query);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }}
+      className="group text-left p-6 glass rounded-2xl hover-lift cursor-pointer hover:border-primary/20"
+    >
+      <div
+        className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors duration-300 ${color}`}
+      >
+        <Icon className="w-7 h-7" />
+      </div>
+      <h3 className="text-base font-bold text-foreground mb-1.5 group-hover:text-primary transition-colors">
+        {label}
+      </h3>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+        {description}
+      </p>
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        Learn more <ArrowRight className="w-3.5 h-3.5" />
+      </span>
+    </button>
+  );
+}
+
+function ServiceGrid({
+  visibleServices,
+  onSelect,
+}: {
+  visibleServices: Service[];
+  onSelect: (query: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {visibleServices.map((service) => (
+        <ServiceCard
+          key={service.label}
+          service={service}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function BrowseByCondition({
+  onSelect,
+  mode = "full",
+  handoffProgress = 0,
+}: BrowseByConditionProps) {
+  const visibleServices: Service[] =
+    mode === "handoff"
+      ? services.slice(0, FIRST_ROW_LENGTH)
+      : mode === "remaining"
+        ? services.slice(FIRST_ROW_LENGTH)
+        : services;
+  const legibilityProgress = Math.min(1, Math.max(0, handoffProgress) / 0.18);
+  const panelTopAlpha = 0.78 + legibilityProgress * 0.22;
+  const panelBottomAlpha = Math.min(1, panelTopAlpha + 0.12);
+  const panelStyle: CSSProperties = {
+    background: `linear-gradient(180deg, rgba(2, 6, 23, ${panelTopAlpha}) 0%, rgba(2, 6, 23, ${panelBottomAlpha}) 100%)`,
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+  };
+
+  if (mode === "handoff") {
+    return (
+      <section id="services" className="relative z-10 w-full">
+        <div
+          className="border-y border-white/10 shadow-[0_30px_80px_-30px_rgba(2,6,23,0.9)]"
+          style={panelStyle}
+        >
+          <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+            <SpecialtyHeading className="mb-10" />
+            <ServiceGrid visibleServices={visibleServices} onSelect={onSelect} />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (mode === "remaining") {
+    return (
+      <section className="relative z-20 bg-background section-padding py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ServiceGrid visibleServices={visibleServices} onSelect={onSelect} />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="services" className="section-padding py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest rounded-full mb-4">
-            Browse Specialties
-          </span>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Search by <span className="gradient-text text-gradient-brand">Medical Need</span>
-          </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Select a specialty to instantly search PM-JAY empanelled hospitals, compare
-            treatment costs, and view verified facility data.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {services.map(({ icon: Icon, label, description, query, color }) => (
-            <button
-              key={label}
-              onClick={() => {
-                onSelect(query);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className="group text-left p-6 glass rounded-2xl hover-lift cursor-pointer hover:border-primary/20"
-            >
-              <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors duration-300 ${color}`}
-              >
-                <Icon className="w-7 h-7" />
-              </div>
-              <h3 className="text-base font-bold text-foreground mb-1.5 group-hover:text-primary transition-colors">
-                {label}
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                {description}
-              </p>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                Learn more <ArrowRight className="w-3.5 h-3.5" />
-              </span>
-            </button>
-          ))}
-        </div>
+        <SpecialtyHeading className="mb-14" />
+        <ServiceGrid visibleServices={visibleServices} onSelect={onSelect} />
       </div>
     </section>
   );
