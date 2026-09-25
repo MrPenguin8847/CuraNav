@@ -2,10 +2,42 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, Menu, X, Siren } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Activity, LogIn, Menu, X, Siren } from "lucide-react";
+
+const navItems = [
+  { label: "Home", href: "/" },
+  { label: "Find Hospital", href: "/find-hospital" },
+  { label: "All Hospitals", href: "/search" },
+  { label: "About Us", href: "/#how-it-works" },
+  { label: "FAQ", href: "/#faq" },
+] as const;
+
+const navLinkClasses =
+  "inline-flex items-center rounded-full px-3 py-2 text-sm font-medium transition-all duration-200";
+
+const isActivePath = (pathname: string, href: string) => {
+  if (href.includes("#")) return false;
+  if (href === "/") return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+};
+
+const getNavLinkClass = (isActive: boolean) =>
+  `${navLinkClasses} ${
+    isActive
+      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+      : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:shadow-sm"
+  }`;
+
+const emergencyLinkClasses =
+  "group inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-error transition-all duration-300 hover:-translate-y-0.5 hover:bg-error/10 hover:shadow-lg hover:shadow-error/20 motion-reduce:transform-none";
+
+const adminLinkClasses =
+  "btn-primary group relative isolate inline-flex items-center justify-center gap-1.5 overflow-hidden rounded-full transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-lg hover:shadow-primary/30 after:pointer-events-none after:absolute after:inset-0 after:z-0 after:-translate-x-full after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent after:content-[''] after:transition-transform after:duration-700 hover:after:translate-x-full motion-reduce:transform-none motion-reduce:after:hidden";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <header className="glass sticky top-0 z-50">
@@ -23,35 +55,32 @@ export function Header() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-8">
-          <Link href="/" className="text-sm font-medium text-primary relative after:absolute after:bottom-[-4px] after:left-0 after:w-full after:h-0.5 after:bg-primary after:rounded-full">
-            Home
-          </Link>
-          <Link href="/find-hospital" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            Find Hospital
-          </Link>
-          <Link href="/search" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            All Hospitals
-          </Link>
-          <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            About Us
-          </Link>
-          <Link href="/#faq" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            FAQ
-          </Link>
+        <nav className="hidden md:flex items-center gap-1 rounded-full border border-border/50 bg-background/50 p-1">
+          {navItems.map((item) => {
+            const isActive = isActivePath(pathname, item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={getNavLinkClass(isActive)}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
-          <Link
-            href="/emergency"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-error px-3 py-2 rounded-lg hover:bg-error/10 transition-colors"
-          >
-            <Siren className="w-4 h-4" />
+          <Link href="/emergency" className={emergencyLinkClasses}>
+            <Siren className="w-4 h-4 transition-transform duration-300 group-hover:scale-110 group-hover:animate-pulse motion-reduce:group-hover:scale-100 motion-reduce:group-hover:animate-none" />
             Emergency
           </Link>
-          <Link href="/admin" className="btn-primary text-sm py-2">
-            Admin Log In
+          <Link href="/admin" className={`${adminLinkClasses} text-sm py-2`}>
+            <LogIn className="relative z-10 w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0" />
+            <span className="relative z-10">Admin Log In</span>
           </Link>
         </div>
 
@@ -68,22 +97,39 @@ export function Header() {
       {/* Mobile Nav */}
       {mobileOpen && (
         <div className="md:hidden border-t border-white/10 glass animate-fade-in">
-          <div className="px-4 py-4 flex flex-col gap-3">
-            <Link href="/" className="text-sm font-medium text-primary py-2" onClick={() => setMobileOpen(false)}>Home</Link>
-            <Link href="/find-hospital" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>Find Hospital</Link>
-            <Link href="/search" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>All Hospitals</Link>
-            <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>About Us</Link>
-            <Link href="/#faq" className="text-sm font-medium text-muted-foreground py-2" onClick={() => setMobileOpen(false)}>FAQ</Link>
-            <hr className="border-white/10" />
+          <div className="px-4 py-4 flex flex-col gap-1">
+            {navItems.map((item) => {
+              const isActive = isActivePath(pathname, item.href);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`${getNavLinkClass(isActive)} w-full justify-center`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+            <hr className="border-white/10 my-2" />
             <Link
               href="/emergency"
-              className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-error py-2"
+              className={`${emergencyLinkClasses} w-full justify-center`}
               onClick={() => setMobileOpen(false)}
             >
-              <Siren className="w-4 h-4" />
+              <Siren className="w-4 h-4 transition-transform duration-300 group-hover:scale-110 group-hover:animate-pulse motion-reduce:group-hover:scale-100 motion-reduce:group-hover:animate-none" />
               Emergency
             </Link>
-            <Link href="/admin" className="btn-primary text-sm text-center" onClick={() => setMobileOpen(false)}>Admin Log In</Link>
+            <Link
+              href="/admin"
+              className={`${adminLinkClasses} w-full text-sm`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <LogIn className="relative z-10 w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0" />
+              <span className="relative z-10">Admin Log In</span>
+            </Link>
           </div>
         </div>
       )}
