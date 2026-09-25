@@ -18,6 +18,7 @@ export default function FindHospitalPage() {
   const [locating, setLocating] = useState(false);
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Restore the user's saved location so it can be sent with the search.
   useEffect(() => {
@@ -25,8 +26,7 @@ export default function FindHospitalPage() {
     if (saved) {
       setLocationCoords({ lat: saved.lat, lon: saved.lon });
       setLocationLabel(saved.label);
-      const savedCity = saved.label.split(",")[0].trim();
-      if (savedCity) setCity(savedCity);
+      if (saved.label !== "Current location") setCity(saved.label);
     }
   }, []);
 
@@ -58,35 +58,57 @@ export default function FindHospitalPage() {
   }, [condition]);
 
   const handleUseLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setLocationError("Location is not supported by your browser");
+      return;
+    }
+
     setLocating(true);
+    setLocationError(null);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        const { latitude, longitude } = position.coords;
+        const coords = { lat: latitude, lon: longitude };
+
         try {
-          const { latitude, longitude } = position.coords;
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
             { headers: { "User-Agent": "CuraNav/1.0" } }
           );
+          if (!res.ok) throw new Error("Location lookup failed");
+
           const data = await res.json();
-          const detectedCity =
-            data.address?.city ??
-            data.address?.town ??
-            data.address?.village ??
-            data.address?.county ??
-            "";
-          if (detectedCity) {
-            setCity(detectedCity);
-            const state = data.address?.state ?? "";
-            const label = [detectedCity, state].filter(Boolean).join(", ");
-            setLocationLabel(label);
-            setLocationCoords({ lat: latitude, lon: longitude });
-            storeLocation({ lat: latitude, lon: longitude, label });
-          }
-        } catch { }
-        finally { setLocating(false); }
+          const address = data.address ?? {};
+          const detectedLocation = data.display_name?.trim() || [
+            address.house_number,
+            address.road ?? address.neighbourhood,
+            address.city ?? address.town ?? address.village ?? address.county,
+            address.state,
+            address.postcode,
+            address.country,
+          ].filter(Boolean).join(", ");
+
+          if (!detectedLocation) throw new Error("Location not found");
+
+          setCity(detectedLocation);
+          setLocationLabel(detectedLocation);
+          setLocationCoords(coords);
+          storeLocation({ ...coords, label: detectedLocation });
+          setLocationError(null);
+        } catch {
+          setLocationError("Could not determine your full location");
+        } finally {
+          setLocating(false);
+        }
       },
-      () => setLocating(false),
+      (error) => {
+        setLocating(false);
+        setLocationError(
+          error.code === error.PERMISSION_DENIED
+            ? "Location permission denied"
+            : "Could not get your location"
+        );
+      },
       { enableHighAccuracy: false, timeout: 10000 }
     );
   };
@@ -99,21 +121,21 @@ export default function FindHospitalPage() {
     e.preventDefault();
 
     const params = new URLSearchParams();
-    if (city.trim()) params.set("city", city.trim());
-    if (specialty.trim()) params.set("specialty", specialty.trim());
-    if (maxBudget.trim()) params.set("max_budget", maxBudget.trim());
-
-    // Attach the user's coordinates when the city matches their location, so the
-    // nearest hospitals are shown.
+    const cityQuery = city.trim();
     if (
-      city.trim() &&
+      cityQuery &&
       locationCoords &&
       locationLabel &&
-      locationLabel.toLowerCase().includes(city.trim().toLowerCase())
+      cityQuery.toLowerCase() === locationLabel.toLowerCase()
     ) {
+      params.set("loc", locationLabel);
       params.set("lat", locationCoords.lat.toString());
       params.set("lon", locationCoords.lon.toString());
+    } else if (cityQuery) {
+      params.set("city", cityQuery);
     }
+    if (specialty.trim()) params.set("specialty", specialty.trim());
+    if (maxBudget.trim()) params.set("max_budget", maxBudget.trim());
 
     const selectedFacilities = Object.entries(facilities)
       .filter(([_, isSelected]) => isSelected)
@@ -151,30 +173,37 @@ export default function FindHospitalPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* City */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="city" className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                    <MapPin className="w-4 h-4 text-primary" />
-                    City / Location
-                  </label>
+                <label htmlFor="city" className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  City / Location
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="city"
+                    name="city"
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="e.g. Pune, Delhi"
+                    className="min-w-0 flex-1 px-4 py-3 bg-background/50 border border-white/10 rounded-xl text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
+                  />
                   <button
                     type="button"
                     onClick={handleUseLocation}
                     disabled={locating}
-                    className="text-xs text-primary font-semibold hover:text-primary/80 flex items-center gap-1 disabled:opacity-50"
+                    aria-busy={locating}
+                    aria-label="Use my location"
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-wait disabled:opacity-60"
                   >
-                    {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <MapPin className="w-3 h-3" />}
-                    Use my location
+                    {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
+                    <span className="whitespace-nowrap">{locating ? "Locating…" : "Use my location"}</span>
                   </button>
                 </div>
-                <input
-                  id="city"
-                  name="city"
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g. Pune, Delhi"
-                  className="w-full px-4 py-3 bg-background/50 border border-white/10 rounded-xl text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
-                />
+                {locationError && (
+                  <p role="alert" className="pt-1 text-xs font-semibold text-warning">
+                    {locationError}
+                  </p>
+                )}
               </div>
 
               {/* Disease */}
