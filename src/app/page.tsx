@@ -24,16 +24,10 @@ export default function Home() {
       <main className="flex-grow">
         <HeroSearch query={query} setQuery={setQuery} />
         <StatStrip />
-        <AurixScrollCanvas
-          handoffContent={(handoffProgress) => (
-            <BrowseByCondition
-              onSelect={setQuery}
-              mode="handoff"
-              handoffProgress={handoffProgress}
-            />
-          )}
-        />
-        <BrowseByCondition onSelect={setQuery} mode="remaining" />
+        <AurixScrollCanvas />
+        <div className="-mt-[100vh] relative z-10">
+          <BrowseByCondition onSelect={setQuery} mode="full" />
+        </div>
         <HowItWorks />
         <WhyChooseUs />
         <Testimonials />

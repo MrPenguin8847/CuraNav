@@ -149,7 +149,7 @@ export default function FindHospitalPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background font-sans">
+    <div className="min-h-screen flex flex-col bg-transparent font-sans">
       <Header />
 
       <main className="flex-grow flex items-center justify-center p-6 sm:p-12 relative">

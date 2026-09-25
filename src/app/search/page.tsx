@@ -334,7 +334,7 @@ function SearchResultsInner() {
   }, [pendingNlData, router]);
 
   return (
-    <div className={`min-h-screen flex flex-col bg-background font-sans ${selectedIds.length > 0 ? "pb-20" : ""}`}>
+    <div className={`min-h-screen flex flex-col bg-transparent font-sans ${selectedIds.length > 0 ? "pb-20" : ""}`}>
       <Header />
 
       <main className="flex-grow max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
@@ -489,7 +489,7 @@ export default function SearchResultsPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex flex-col bg-background font-sans">
+        <div className="min-h-screen flex flex-col bg-transparent font-sans">
           <Header />
           <main className="flex-grow max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
             <LoadingState />

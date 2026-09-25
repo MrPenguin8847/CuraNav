@@ -254,19 +254,20 @@ export function AurixScrollCanvas({ handoffContent }: AurixScrollCanvasProps) {
   }, [loadedFrames, requestRender]);
 
   const hudOpacity = Math.max(0, 1 - handoffProgress / 0.22);
+  const canvasOpacity = Math.max(0, 1 - handoffProgress * 2);
 
   return (
-    <section className="relative bg-black w-full">
+    <section className="relative bg-transparent w-full">
       <div
         ref={containerRef}
         className="relative w-full"
         style={{ height: `${totalViewports * 100}vh` }}
       >
-        <div className="sticky top-0 z-0 w-full h-screen overflow-hidden bg-black">
+        <div className="sticky top-0 z-0 w-full h-screen overflow-hidden bg-transparent">
           <canvas
             ref={canvasRef}
             className="absolute inset-0 w-full h-full"
-            style={{ zIndex: 1 }}
+            style={{ zIndex: 1, mixBlendMode: "screen", opacity: canvasOpacity }}
           />
           <div
             style={{

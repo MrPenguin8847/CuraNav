@@ -34,7 +34,7 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background font-sans">
+    <div className="min-h-screen flex flex-col bg-transparent font-sans">
       <Header />
 
       <main className="flex-grow flex flex-col items-center justify-center p-4">

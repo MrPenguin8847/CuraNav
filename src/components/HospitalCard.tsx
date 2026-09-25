@@ -367,10 +367,10 @@ export function HospitalCard({
 
   return (
     <article
-      className={`card p-5 md:p-6 transition-all duration-200 relative ${
+      className={`glass bg-background/40 rounded-2xl border border-white/10 p-5 md:p-6 transition-all duration-200 relative ${
         isSelected
           ? "border-primary shadow-md shadow-primary/10 ring-1 ring-primary/30"
-          : "hover:shadow-md"
+          : "hover:shadow-md hover:bg-background/50 hover:border-white/20"
       } ${isTopResult ? "ring-2 ring-primary/20 border-primary/30" : ""}`}
     >
       {/* Top Result badge */}

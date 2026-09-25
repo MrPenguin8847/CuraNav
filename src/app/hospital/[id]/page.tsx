@@ -83,7 +83,7 @@ function Section({
 // ─── Not-found state — styled consistently, not the Next.js default 404 ──────
 function HospitalNotFound({ id }: { id: string }) {
   return (
-    <div className="min-h-screen flex flex-col bg-background font-sans">
+    <div className="min-h-screen flex flex-col bg-transparent font-sans">
       <Header />
       <main className="flex-grow flex flex-col items-center justify-center px-4 py-24 text-center">
         <div className="w-16 h-16 rounded-full bg-background/50 border border-white/10 flex items-center justify-center mb-5">
@@ -159,7 +159,7 @@ export default async function HospitalDetailPage({
   const matchingSpecialty = specialties[0] ?? "General";
 
   return (
-    <div className="min-h-screen flex flex-col bg-background font-sans">
+    <div className="min-h-screen flex flex-col bg-transparent font-sans">
       <Header />
 
       <main className="flex-grow max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 space-y-5">

@@ -169,9 +169,8 @@ export function BrowseByCondition({
   const panelTopAlpha = 0.78 + legibilityProgress * 0.22;
   const panelBottomAlpha = Math.min(1, panelTopAlpha + 0.12);
   const panelStyle: CSSProperties = {
-    background: `linear-gradient(180deg, rgba(2, 6, 23, ${panelTopAlpha}) 0%, rgba(2, 6, 23, ${panelBottomAlpha}) 100%)`,
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
+    background: `transparent`,
+    // Removing heavy blur so stars remain crisp
   };
 
   if (mode === "handoff") {

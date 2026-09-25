@@ -736,7 +736,7 @@
 
   /* — Glass Surface — */
   .glass {
-    background: color-mix(in srgb, var(--color-bg-base) 60%, transparent);
+    background: color-mix(in srgb, var(--color-surface-1) 60%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: var(--border-width) solid color-mix(in srgb, var(--color-border-default) 40%, transparent);

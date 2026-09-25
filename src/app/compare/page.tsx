@@ -162,7 +162,7 @@ function FacilityCell({ has, facility }: { has: boolean; facility: string }) {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 function EmptyCompare() {
   return (
-    <div className="min-h-screen flex flex-col bg-background font-sans">
+    <div className="min-h-screen flex flex-col bg-transparent font-sans">
       <Header />
       <main className="flex-grow flex flex-col items-center justify-center px-4 py-24 text-center">
         <div className="w-16 h-16 rounded-full bg-background/50 border border-white/10 flex items-center justify-center mb-5">
@@ -403,7 +403,7 @@ function ComparePageInner() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col bg-background font-sans">
+      <div className="min-h-screen flex flex-col bg-transparent font-sans">
         <Header />
         <main className="flex-grow flex items-center justify-center">
           <p className="text-slate-400 text-sm">Loading comparison…</p>
@@ -416,7 +416,7 @@ function ComparePageInner() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col bg-background font-sans">
+      <div className="min-h-screen flex flex-col bg-transparent font-sans">
         <Header />
         <main className="flex-grow flex items-center justify-center">
           <div className="card p-8 text-center space-y-3 max-w-sm">
@@ -451,7 +451,7 @@ function ComparePageInner() {
   const colClass = n === 2 ? "w-1/2" : n === 3 ? "w-1/3" : n === 4 ? "w-1/4" : "w-1/5";
 
   return (
-    <div className="min-h-screen flex flex-col bg-background font-sans">
+    <div className="min-h-screen flex flex-col bg-transparent font-sans">
       <Header />
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
@@ -823,7 +823,7 @@ function ComparePageInner() {
 export default function ComparePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex flex-col bg-background font-sans">
+      <div className="min-h-screen flex flex-col bg-transparent font-sans">
         <Header />
         <main className="flex-grow flex items-center justify-center">
           <p className="text-slate-400 text-sm">Loading comparison…</p>
