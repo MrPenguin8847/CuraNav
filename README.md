@@ -26,7 +26,7 @@ CuraNav helps patients and caregivers discover **Ayushman Bharat PM-JAY empanell
 
 The platform addresses a real-world problem: government-published hospital directories (such as NHA's Health Empanelment Module at `hem.nha.gov.in`) are hard to browse, have no patient-friendly comparison tools, and give no sense of cost, outcomes, or available facilities. CuraNav imports this public dataset, lets users search in plain language ("cardiac surgeon with ICU under ₹50,000 in Delhi"), explains *how* it interpreted the query, and lets them compare hospitals side-by-side with an AI-generated summary.
 
-Data is seeded with **79 real PM-JAY empanelled records** imported from the official NHA CSV exports, then enriched with coordinates, success rates, and cost estimates.
+Data is seeded with **274 real PM-JAY empanelled records** imported from the official NHA CSV exports, then enriched with coordinates, success rates, and cost estimates.
 
 ## Features
 
