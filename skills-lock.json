@@ -85,11 +85,23 @@
       "skillPath": "skills/cloud/alloydb-basics/SKILL.md",
       "computedHash": "c3bc5c916b5b23c1ee4f23a24debebe20b5ea4ec1d004a3bb907740fdd5902fe"
     },
+    "api-security-testing": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/api-security-testing/SKILL.md",
+      "computedHash": "2cda580144136513c89ccca81b15481a1a5b0f7ffd0fe390d61a0ef40006bd0e"
+    },
     "application-design-center-design-deploy": {
       "source": "google/skills",
       "sourceType": "github",
       "skillPath": "skills/cloud/application-design-center-design-deploy/SKILL.md",
       "computedHash": "8117ea721e7215b53a3a9b55ce45904ef80780c37f2e7d6d57ba6a812b9b91c4"
+    },
+    "application-security-testing": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/application-security-testing/SKILL.md",
+      "computedHash": "3869b05bff8e91d2eee9ec98845e5a0fe0a73cca74ceef8c80b7dadc011431ff"
     },
     "bigquery-ai-ml": {
       "source": "google/skills",
@@ -126,6 +138,12 @@
       "sourceType": "github",
       "skillPath": "skills/cloud/bigtable-basics/SKILL.md",
       "computedHash": "efafeacd08081cf4c61aa069bafd07371d499b4456b90b446c46e468d4390e45"
+    },
+    "ci-security-scanning-with-strix": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/ci-security-scanning-with-strix/SKILL.md",
+      "computedHash": "ac3b8d18690ee68dcf178f3156caac1006da4377f4e3a02a55cb7ebe99566d9f"
     },
     "cloud-build-basics": {
       "source": "google/skills",
@@ -277,6 +295,12 @@
       "skillPath": "skills/identity/dpop-adoption/SKILL.md",
       "computedHash": "194428463db05e5fb4e3e5819b51a57d06eba037c1b6514fb8ab89b6de6caa57"
     },
+    "find-security-vulnerabilities-in-code": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/find-security-vulnerabilities-in-code/SKILL.md",
+      "computedHash": "b9aaebedb74653bed108ad54790be164fc70e60ca6fbca844e379cb0408498cf"
+    },
     "finding-google-skills": {
       "source": "google/skills",
       "sourceType": "github",
@@ -288,6 +312,12 @@
       "sourceType": "github",
       "skillPath": "skills/cloud/firebase-basics/SKILL.md",
       "computedHash": "12e54a6dde0e9deda65494062a1aa178b37018895df219434ba5686db94008e0"
+    },
+    "fix-security-vulnerabilities-with-strix": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/fix-security-vulnerabilities-with-strix/SKILL.md",
+      "computedHash": "1f91d165671877f77b0c23f34a4596375dc425de388f5b17d2a4742194a8bfb8"
     },
     "gcloud": {
       "source": "google/skills",
@@ -835,6 +865,24 @@
       "skillPath": "skills/cloud/managed-airflow-migrations/SKILL.md",
       "computedHash": "a8c98a8f993a9c8d7f5b817bfaf60f147216be0c41bf479a493d077e94ba266b"
     },
+    "managed-pentesting-with-strix": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/managed-pentesting-with-strix/SKILL.md",
+      "computedHash": "64c0544b9c50750f3d417cae3fdc5cb8710ca0a0d6ac29ed3b81807e37d63ee1"
+    },
+    "owasp-top-10-testing": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/owasp-top-10-testing/SKILL.md",
+      "computedHash": "82a5e167fd58e3641e61097f9206c8ecaab30e18bbf932499c85a4f58a6a49ba"
+    },
+    "penetration-testing-with-strix": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/penetration-testing-with-strix/SKILL.md",
+      "computedHash": "0dce672086a5b3cc00f69884eeb6b38e9e331a7ba97639c11500e453c70ca565"
+    },
     "retrieving-developer-knowledge": {
       "source": "google/skills",
       "sourceType": "github",
@@ -876,6 +924,12 @@
       "sourceType": "github",
       "skillPath": "skills/cloud/spanner-basics/SKILL.md",
       "computedHash": "7cd7c30ec77191dc14cc043227ffb12bde4c2991a0900415c8cc7a6fdac6f749"
+    },
+    "web-app-penetration-testing": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/web-app-penetration-testing/SKILL.md",
+      "computedHash": "4a26881a2e8d289611e12557aea27f729facfa4aef777ddcb43a6b6f7d6fe2ee"
     },
     "workload-manager-basics": {
       "source": "google/skills",
