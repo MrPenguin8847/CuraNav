@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { EmergencyHospitalCard } from "@/components/EmergencyHospitalCard";
@@ -14,6 +16,7 @@ import {
   Ambulance,
   Info,
   AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 
 type LocationState = {
@@ -22,7 +25,13 @@ type LocationState = {
   label: string | null;
 } | null;
 
-export default function EmergencyPage() {
+const EMERGENCY_SPECIALTIES =
+  "Emergency Medicine,Emergency Stabilization,Critical Care,Trauma Care";
+
+function EmergencyPageContent() {
+  const searchParams = useSearchParams();
+  const fromTriage = searchParams.get("from") === "triage";
+
   const [locating, setLocating] = useState(false);
   const [location, setLocation] = useState<LocationState>(null);
   const [cityInput, setCityInput] = useState("");
@@ -39,7 +48,9 @@ export default function EmergencyPage() {
       setUsedFallback(false);
       try {
         const params = new URLSearchParams();
-        params.set("specialty", "Emergency Room Packages");
+        // "Emergency Room Packages" does not exist in the dataset. These are
+        // the real emergency-capable specialty values.
+        params.set("specialty", EMERGENCY_SPECIALTIES);
         params.set("radius_km", "120");
 
         if (coords) {
@@ -58,7 +69,7 @@ export default function EmergencyPage() {
         // emergency-capable hospitals.
         if (data.hospitals.length === 0 && (coords || city?.trim())) {
           const fallbackParams = new URLSearchParams();
-          fallbackParams.set("specialty", "Emergency Room Packages");
+          fallbackParams.set("specialty", EMERGENCY_SPECIALTIES);
           res = await fetch(`/api/hospitals?${fallbackParams.toString()}`);
           if (res.ok) {
             data = (await res.json()) as { hospitals: Hospital[] };
@@ -75,6 +86,7 @@ export default function EmergencyPage() {
     },
     []
   );
+
 
   // Initial load: prefer saved location, otherwise ask for geolocation.
   useEffect(() => {
@@ -137,8 +149,24 @@ export default function EmergencyPage() {
     <div className="min-h-screen flex flex-col bg-transparent font-sans">
       <Header />
 
-      <main className="flex-grow w-full max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        {/* ── Urgent banner: call a helpline first ── */}
+        <main className="flex-grow w-full max-w-3xl mx-auto px-4 sm:px-6 py-8">
+          {/* ── Arrived from the symptom checker ── */}
+          {fromTriage && (
+            <section className="mb-6 rounded-2xl border border-error/30 bg-error/5 p-4 flex items-start gap-3">
+              <ClipboardList className="w-5 h-5 text-error mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="text-foreground font-semibold">
+                  Your symptom check flagged signs that need immediate care.
+                </p>
+                <p className="text-muted-foreground mt-1">
+                  Please do not wait for an appointment. Call an ambulance or
+                  go to the nearest emergency department now.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* ── Urgent banner: call a helpline first ── */}
         <section className="mb-8 rounded-3xl bg-gradient-to-br from-error/15 to-error/5 border border-error/20 overflow-hidden">
           <div className="p-6 sm:p-8">
             <div className="flex items-center gap-3 mb-3">
@@ -285,5 +313,26 @@ export default function EmergencyPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function EmergencyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col bg-transparent font-sans">
+          <Header />
+          <main className="flex-grow w-full max-w-3xl mx-auto px-4 sm:px-6 py-8">
+            <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              Loading emergency options…
+            </p>
+          </main>
+          <Footer />
+        </div>
+      }
+    >
+      <EmergencyPageContent />
+    </Suspense>
   );
 }

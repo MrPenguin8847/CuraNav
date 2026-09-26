@@ -15,7 +15,7 @@
 ## 2. Frontend entry point
 
 - **App shell:** `src/app/layout.tsx` — fonts, global `dark` class, metadata. Mounts `<Chatbot />` and `<EmergencyGate />` on **every** page. It does **not** render Header/Footer.
-- **Home:** `src/app/page.tsx` (client component). Header + `<main>` sections (HeroSearch, StatStrip, AurixScrollCanvas, BrowseByCondition, HowItWorks, WhyChooseUs, Testimonials, AppDownloadCTA, FAQ) + Footer.
+- **Home:** `src/app/page.tsx` (client component). Header + `<main>` sections (HeroSearch, StatStrip, **SymptomCheckCTA**, AurixScrollCanvas, BrowseByCondition, HowItWorks, WhyChooseUs, Testimonials, AppDownloadCTA, FAQ) + Footer.
 - Each page renders its own `<Header />` / `<Footer />` (`src/components/Header.tsx`, `Footer.tsx`). If you add a page, include both.
 
 ## 3. Backend entry point
@@ -33,7 +33,8 @@
 | `/find-hospital` | `src/app/find-hospital/page.tsx` | Location-based "nearest hospital" finder |
 | `/hospital/[id]` | `src/app/hospital/[id]/page.tsx` | Detail page — **server component** (supabaseAdmin) |
 | `/compare` | `src/app/compare/page.tsx` | Compare 2–5 hospitals + AI summary (`?ids=`) |
-| `/emergency` | `src/app/emergency/page.tsx` | Emergency nearest-hospital flow (specialty `Emergency Room Packages`) |
+| `/emergency` | `src/app/emergency/page.tsx` | Emergency nearest-hospital flow. Specialty filter is `Emergency Medicine,Emergency Stabilization,Critical Care,Trauma Care`. Also serves triage handoffs via `?from=triage`. |
+| `/symptoms` | `src/app/symptoms/page.tsx` | 3-step symptom intake + triage wizard (symptoms -> context -> result). See section 9. |
 | `/admin` | `src/app/admin/page.tsx` | Admin dashboard (protected) |
 | `/admin/login` | `src/app/admin/login/page.tsx` | Supabase password login |
 | `/aurix` | `src/app/aurix/page.tsx` | "Coming soon" AI-vision placeholder |
@@ -52,6 +53,8 @@
 | `/api/compare/ai` | POST | Side-by-side comparison explanation for 2–5 hospital ids (**waterfall**: Groq → OpenRouter → Gemini). |
 | `/api/chat` | POST | Site chatbot (Groq, `GROQ_API_KEY_2`, model `qwen/qwen3.8-27b`), receives page context. |
 | `/api/stats` | GET | Homepage platform stats (consumed by `usePlatformStats`, 30s cache). |
+| `/api/symptoms/triage` | POST | Symptom intake triage. See section 9. |
+| `/api/symptoms/triage` | GET | Exposes `durations`, `intensities`, `ages`, `redFlags` so the UI never hard-codes those vocabularies. |
 
 ## 6. Authentication flow
 
@@ -130,6 +133,39 @@ The code scans the env for **key prefixes**, so any of these applies: `GROQ_API_
 - **Schema change** → edit `Supabase/curanav_schema.sql`, add a new migration file, **and** update `src/lib/mapHospital.ts`.
 - **New/real data** → replace CSVs in `Dataset csv files/`, run `scripts/import-csv.js` to regenerate `mockHospitals.ts` + `Supabase/curanav_seed_data.sql`.
 - **New AI provider** → follow the provider-push pattern in `src/app/api/search/natural-language/route.ts` (list keys with prefix, waterfall loop, continue on error).
+- **New red flag / home-care entry / symptom cluster** → edit `src/lib/triage/redFlags.ts`, `homeCare.ts`, `clusters.ts`, then run `npm run verify:triage`. Never let the model author clinical text.
+- **New specialty value** → add it to `CANONICAL_SPECIALTIES` in `src/lib/specialties.ts` and confirm it exists in the seeded `hospitals.specialties` vocabulary.
+
+## 14. Symptom triage (`/symptoms`)
+
+The safety invariant that governs this whole feature: **the LLM is an advisor, never an authority.** It may only *raise* severity. It never authors clinical text, and it never lowers a level the rule engine computed.
+
+Severity is merged across three layers with `maxSeverity()`, so a higher layer can only ever move the result upward:
+
+1. **Deterministic red flags** (`src/lib/triage/redFlags.ts`) — 28 rules over free text + self-reported ticks. Any hit ⇒ `emergency`. These run *before* any provider call, so an emergency short-circuits the AI entirely (no latency, no cost, no provider failure able to delay the answer).
+2. **Cluster-derived severity** (`clusters.ts`, `duration.ts`) — keyword/pattern clusters carry a base severity, then duration, intensity, age, pregnancy, and existing conditions apply modifiers. Clusters also bridge to the hospital dataset: each one carries real `specialties` and vetted `careKeys`.
+3. **Model advisory** (`schema.ts`) — the provider returns clusters, `model_severity`, a normalized complaint, associated symptoms, and `care_keys` (whitelist of keys only). `validateTriageResponse` drops any value not in a known enum, so a hallucinated specialty, cluster, or care key cannot reach the UI.
+
+Resulting tiers map onto existing design tokens — `emergency`→`error`, `urgent`→`warning`, `routine`→`info`, `self_care`→`success` (see `SEVERITY_TOKEN`).
+
+| File | Role |
+|---|---|
+| `src/lib/triage/types.ts` | Severities, vocabularies, `TriageInput`/`TriageResult`, disclaimers |
+| `src/lib/triage/redFlags.ts` | 28 emergency rules, age gating, `detectRedFlags()` |
+| `src/lib/triage/clusters.ts` | Symptom clusters → severity + specialties + care keys (has `exclude` veto patterns for overlap) |
+| `src/lib/triage/duration.ts` | Duration/intensity/age/pregnancy modifiers, `canSelfCare()` |
+| `src/lib/triage/homeCare.ts` | 22 human-authored entries, each with a mandatory `stopIf` |
+| `src/lib/triage/assessment.ts` | `assess()` — the three-layer merge and result construction |
+| `src/lib/triage/schema.ts` | System prompt, `parseModelJson()`, whitelist validator |
+| `src/lib/triage/intakeSummary.ts` | Copyable/printable clinical intake summary |
+| `src/lib/specialties.ts` | `CANONICAL_SPECIALTIES` + normalization shared with `/api/hospitals` |
+| `scripts/verify-triage.ts` | 84 safety assertions — `npm run verify:triage` |
+
+**Privacy:** nothing is persisted server-side. The in-progress draft lives in `sessionStorage` only (key `curanav:triage-draft`) and is discarded when the tab closes. No name, phone, or address is ever requested.
+
+**Rate limiting:** in-memory token bucket per client, 12 requests/minute. Resets on server restart, which is acceptable for a single-instance demo but is **not** suitable for multi-instance deploys.
+
+**Emergency UX:** `EmergencyInterstitial` deliberately does *not* auto-redirect. An automatic `router.replace` would yank the page away before the user has read what was found. The interstitial holds the full viewport with unmissable 108/112 actions and one tap to `/emergency?from=triage`.
 
 ---
 
@@ -257,12 +293,13 @@ erDiagram
 2. `src/middleware.ts`
 3. `src/app/api/hospitals/route.ts`
 4. `src/app/api/search/natural-language/route.ts`
-5. `src/lib/mapHospital.ts`
-6. `mockHospitals.ts` (root)
-7. `src/lib/supabase.ts` (+ browser/server variants)
-8. `Supabase/curanav_schema.sql`
-9. `src/components/HospitalCard.tsx`
-10. `scripts/import-csv.js`
+5. `src/lib/triage/assessment.ts` (safety-critical merge logic for `/symptoms`)
+6. `src/lib/mapHospital.ts`
+7. `mockHospitals.ts` (root)
+8. `src/lib/supabase.ts` (+ browser/server variants)
+9. `Supabase/curanav_schema.sql`
+10. `src/components/HospitalCard.tsx`
+11. `scripts/import-csv.js`
 
 ## E. 60-second explanation
 

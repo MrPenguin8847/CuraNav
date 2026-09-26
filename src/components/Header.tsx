@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, LogIn, Menu, X, Siren } from "lucide-react";
+import { Activity, LogIn, Menu, X, Siren, Stethoscope } from "lucide-react";
 
 const navItems = [
   { label: "Home", href: "/" },
+  { label: "Symptom Check", href: "/symptoms", accent: true },
   { label: "Find Hospital", href: "/find-hospital" },
   { label: "All Hospitals", href: "/search" },
   { label: "About Us", href: "/#how-it-works" },
@@ -27,6 +28,18 @@ const getNavLinkClass = (isActive: boolean) =>
     isActive
       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
       : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:shadow-sm"
+  }`;
+
+/**
+ * The symptom checker is the flagship flow, so it gets a persistent brand tint
+ * in the nav rather than only on hover — a patient in distress should not have
+ * to hunt for it.
+ */
+const getAccentLinkClass = (isActive: boolean) =>
+  `${navLinkClasses} gap-1.5 ${
+    isActive
+      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+      : "text-primary bg-primary/10 hover:bg-primary/15 hover:shadow-sm"
   }`;
 
 const emergencyLinkClasses =
@@ -58,14 +71,21 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-1 rounded-full border border-border/50 bg-background/50 p-1">
           {navItems.map((item) => {
             const isActive = isActivePath(pathname, item.href);
+            const className =
+              "accent" in item && item.accent
+                ? getAccentLinkClass(isActive)
+                : getNavLinkClass(isActive);
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                className={getNavLinkClass(isActive)}
+                className={className}
               >
+                {"accent" in item && item.accent && (
+                  <Stethoscope className="w-3.5 h-3.5" />
+                )}
                 {item.label}
               </Link>
             );
@@ -100,15 +120,22 @@ export function Header() {
           <div className="px-4 py-4 flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive = isActivePath(pathname, item.href);
+              const className =
+                "accent" in item && item.accent
+                  ? getAccentLinkClass(isActive)
+                  : getNavLinkClass(isActive);
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`${getNavLinkClass(isActive)} w-full justify-center`}
+                  className={`${className} w-full justify-center`}
                   onClick={() => setMobileOpen(false)}
                 >
+                  {"accent" in item && item.accent && (
+                    <Stethoscope className="w-3.5 h-3.5" />
+                  )}
                   {item.label}
                 </Link>
               );

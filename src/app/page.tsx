@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { HeroSearch } from "@/components/HeroSearch";
 import { StatStrip } from "@/components/StatStrip";
+import { SymptomCheckCTA } from "@/components/SymptomCheckCTA";
 import { BrowseByCondition } from "@/components/BrowseByCondition";
 import { HowItWorks } from "@/components/HowItWorks";
 import { WhyChooseUs } from "@/components/WhyChooseUs";
@@ -24,6 +25,7 @@ export default function Home() {
       <main className="flex-grow">
         <HeroSearch query={query} setQuery={setQuery} />
         <StatStrip />
+        <SymptomCheckCTA />
         <AurixScrollCanvas />
         <div className="-mt-[100vh] relative z-10">
           <BrowseByCondition onSelect={setQuery} mode="full" />

@@ -96,10 +96,17 @@ export default function AdminLogin() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full btn-primary py-2.5 text-sm font-semibold rounded-xl mt-2 disabled:opacity-70 flex justify-center"
+                aria-busy={isLoading}
+                className="btn-primary mt-2 w-full h-12 [--btn-radius:var(--radius-xl)] px-6 text-sm"
               >
                 {isLoading ? (
-                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                    />
+                    Signing in…
+                  </>
                 ) : (
                   "Sign In"
                 )}

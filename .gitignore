@@ -40,5 +40,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# local planning scratch
 plan.md
-.env.local
+
+# Agent tooling installed on this machine (Google Cloud + UI/UX skill packs).
+# These are ~830 files of vendored agent instructions, not application code, and
+# nothing in the build reads them. Ignoring them keeps the repository readable;
+# the folders stay on disk, so re-enabling them is just `git add -f .agents`.
+/.agents/
+/.agent/
+
+# Artifact from an external security scanner, not part of the site.
+/public/.well-known/strix-verify.txt

@@ -735,11 +735,75 @@
   }
 
   /* — Glass Surface — */
+  /* Declare `backdrop-filter` on its own. Writing the `-webkit-` twin next to
+     it made the CSS minifier collapse the pair down to the prefixed form,
+     which current Chromium ignores — so every .glass surface (header, emergency
+     gate, symptom panel) silently rendered with no blur at all. Prefixes are
+     added downstream; do not hand-write them here. */
   .glass {
     background: color-mix(in srgb, var(--color-surface-1) 60%, transparent);
     backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     border: var(--border-width) solid color-mix(in srgb, var(--color-border-default) 40%, transparent);
+  }
+
+  /* — Buttons — */
+  /* Referenced across Header, HeroSearch, HospitalCard, EmptyState and the
+     symptom checker. Defined here so all of them actually render. */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    /* The default lives in the fallback slot, not as a declaration, so a caller
+       can reshape the button with `[--btn-radius:…]`. A plain `rounded-*`
+       utility cannot do it: this block is emitted after Tailwind's own
+       utilities, so it would always win the cascade. */
+    border-radius: var(--btn-radius, var(--radius-full));
+    font-weight: var(--weight-bold);
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--primary-foreground);
+    background: var(--gradient-brand);
+    box-shadow: var(--shadow-brand);
+    transition: var(--transition-all);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.06);
+    box-shadow: var(--shadow-brand-lg);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    border-radius: var(--btn-radius, var(--radius-full));
+    font-weight: var(--weight-bold);
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--color-fg-base);
+    background: color-mix(in srgb, var(--color-surface-2) 70%, transparent);
+    border: var(--border-width) solid var(--color-border-default);
+    transition: var(--transition-all);
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-surface-2);
+    border-color: color-mix(in srgb, var(--color-brand-500) 40%, transparent);
+  }
+
+  .btn-primary:disabled,
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn-primary:hover {
+      transform: none;
+    }
   }
 
   /* — Hover Lift — */

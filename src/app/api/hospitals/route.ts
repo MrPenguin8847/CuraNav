@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createServerClient } from "@/lib/supabase-server";
 import { mapHospital } from "@/lib/mapHospital";
+import {
+  normalizeExplicitSpecialty,
+  normalizeFacilities,
+  resolveSpecialtyHint,
+} from "@/lib/specialties";
 
 // Helper for demo coordinate resolution
 const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
@@ -126,40 +131,15 @@ export async function GET(req: NextRequest) {
     return q;
   };
 
-  // Fallback mapping so natural-language terms resolve to the hospital specialties in the dataset
-  let resolvedSpecialty = specialty;
-  const searchStr = `${specialty || ''} ${condition || ''} ${facilitiesParam || ''}`.toLowerCase();
-
-  if (searchStr.includes("kidney") || searchStr.includes("renal") || searchStr.includes("nephro") || searchStr.includes("dialysis")) {
-    resolvedSpecialty = "General Medicine,Nephrology";
-  } else if (searchStr.includes("heart") || searchStr.includes("cardio") || searchStr.includes("bypass")) {
-    resolvedSpecialty = "Cardiology";
-  } else if (searchStr.includes("cancer") || searchStr.includes("tumor") || searchStr.includes("oncol") || searchStr.includes("chemo")) {
-    resolvedSpecialty = "General Surgery";
-  } else if (searchStr.includes("bone") || searchStr.includes("joint") || searchStr.includes("ortho") || searchStr.includes("fracture") || searchStr.includes("spine")) {
-    resolvedSpecialty = "Orthopaedics";
-  } else if (searchStr.includes("child") || searchStr.includes("pediatric") || searchStr.includes("paediatric") || searchStr.includes("baby") || searchStr.includes("infant") || searchStr.includes("neonat")) {
-    resolvedSpecialty = "Paediatric Medical Management";
-  } else if (searchStr.includes("pregnan") || searchStr.includes("matern") || searchStr.includes("women") || searchStr.includes("gynae") || searchStr.includes("gyne") || searchStr.includes("delivery")) {
-    resolvedSpecialty = "Obstetrics & Gynaecology";
-  } else if (searchStr.includes("burn")) {
-    resolvedSpecialty = "Burns Management";
-  } else if (searchStr.includes("eye") || searchStr.includes("vision") || searchStr.includes("ophthal") || searchStr.includes("cataract")) {
-    resolvedSpecialty = "Ophthalmology";
-  } else if (searchStr.includes("emergency") || searchStr.includes("trauma") || searchStr.includes("accident")) {
-    resolvedSpecialty = "Emergency Room Packages";
-  } else if (searchStr.includes("neuro") || searchStr.includes("brain") || searchStr.includes("stroke")) {
-    resolvedSpecialty = "Neurosurgery";
-  } else if (searchStr.includes("ear") || searchStr.includes("nose") || searchStr.includes("throat") || searchStr.includes("ent") || searchStr.includes("sinus")) {
-    resolvedSpecialty = "Otorhinolaryngology (ENT)";
-  } else if (searchStr.includes("urin") || searchStr.includes("urolog") || searchStr.includes("prostate") || searchStr.includes("bladder")) {
-    resolvedSpecialty = "Urology";
-  } else if (searchStr.includes("plastic") || searchStr.includes("cosmetic") || searchStr.includes("reconstruct")) {
-    resolvedSpecialty = "Plastic & Reconstructive Surgery";
-  } else if (searchStr.includes("surgery") || searchStr.includes("surgical") || searchStr.includes("operation")) {
-    resolvedSpecialty = "General Surgery";
-  } else if (searchStr.includes("general") || searchStr.includes("fever") || searchStr.includes("checkup")) {
-    resolvedSpecialty = "General Medicine";
+  // Fallback mapping so natural-language terms resolve to real dataset
+  // specialties. An explicit `specialty` param is trusted as-is when every
+  // comma-separated part already exists in the dataset, so callers such as the
+  // symptom checker are never clobbered by the fuzzy hints below.
+  const explicitSpecialty = normalizeExplicitSpecialty(specialty);
+  let resolvedSpecialty = explicitSpecialty ?? specialty;
+  if (!explicitSpecialty) {
+    const searchStr = `${specialty || ""} ${condition || ""} ${facilitiesParam || ""}`.toLowerCase();
+    resolvedSpecialty = resolveSpecialtyHint(searchStr) ?? specialty;
   }
 
   let query = buildQuery();
@@ -199,14 +179,12 @@ export async function GET(req: NextRequest) {
     filtersApplied.condition = condition;
   }
 
-  if (facilitiesParam) {
-    const facilities = facilitiesParam
-      .split(",")
-      .map((f) => f.trim())
-      .filter(Boolean);
+  const facilities = normalizeFacilities(facilitiesParam);
+  if (facilities) {
+    // Only apply the filter when every requested value exists in the dataset,
+    // so we never report a filter as applied that silently did nothing.
     if (facilities.length > 0) {
-      // Mock data lacks facilities, so we temporarily disable strict DB filtering
-      // query = query.contains("facilities", facilities);
+      query = query.contains("facilities", facilities);
       filtersApplied.facilities = facilities;
     }
   }
