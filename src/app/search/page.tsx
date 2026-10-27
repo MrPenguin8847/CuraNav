@@ -8,16 +8,52 @@ import { ArrowLeft, ListFilter, SlidersHorizontal, MapPin, Loader2 } from "lucid
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ExplainabilityPanel } from "@/components/ExplainabilityPanel";
+import { SearchNotices } from "@/components/SearchNotices";
 import { HospitalCard } from "@/components/HospitalCard";
 import { CompareBar } from "@/components/CompareBar";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingState } from "@/components/LoadingState";
+import { LoadErrorState } from "@/components/LoadErrorState";
 import { Hospital } from "@/lib/mockHospitals";
 import { Suspense } from "react";
 import { ManualFilters } from "@/components/ManualFilters";
 import { getStoredLocation, storeLocation } from "@/lib/userLocation";
+import { fetchWithTimeout, isTimeoutError, RequestTimeoutError } from "@/lib/fetchWithTimeout";
+import { describeError, type LoadFailure, type LoadStatus } from "@/lib/loadState";
+import { getPositionWithDeadline } from "@/lib/geolocation";
+import {
+  buildTransparencyNotices,
+  intentToChips,
+  intentToQueryParams,
+  type SearchIntent,
+  type TransparencyNotice,
+} from "@/lib/searchIntent";
 
-type SortKey = "match" | "cost" | "distance" | "verified";
+/** The NL structuring call is itself budgeted server-side; this is the outer net. */
+const NL_TIMEOUT_MS = 10_000;
+const HOSPITALS_TIMEOUT_MS = 12_000;
+/** Bounds the location permission prompt; see `getPositionWithDeadline`. */
+const GEOLOCATION_TIMEOUT_MS = 8_000;
+
+type HospitalsResponse = {
+  hospitals: Hospital[];
+  count: number;
+  notes?: string[];
+  relaxed?: boolean;
+};
+
+type NlResponse = {
+  intent: SearchIntent;
+  chips: { icon: string; label: string; value: string }[];
+  notices: TransparencyNotice[];
+  explanation: {
+    query: string;
+    extractor: string;
+    usedLocalFallback: boolean;
+    wantsNearby: boolean;
+    elapsed_ms: number;
+  };
+};
 
 const SORT_LABELS: Record<SortKey, string> = {
   match: "Best Match",
@@ -32,17 +68,29 @@ const VERIFICATION_ORDER: Record<string, number> = {
   simulated: 2,
 };
 
+type SortKey = "match" | "cost" | "distance" | "verified";
+
 // ─── Inner component (reads searchParams) ─────────────────────────────────────
 function SearchResultsInner() {
   const searchParams = useSearchParams();
   const rawQuery = searchParams.get("q") ?? "";
 
   // ── Data fetching state ───────────────────────────────────────────────────
+  // One discriminant instead of `isLoading` + `error`, so the "nothing loading,
+  // nothing failed, nothing arrived" state is not representable.
+  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [explanation, setExplanation] = useState<{ query: string; chips: any[] } | null>(null);
-  const [nlFilters, setNlFilters] = useState<Record<string, string | number | null>>({}); // NL-extracted filters
+  const [explanation, setExplanation] = useState<{
+    query: string;
+    chips: { icon: string; label: string; value: string }[];
+  } | null>(null);
+  const [notices, setNotices] = useState<TransparencyNotice[]>([]);
+  const [serverNotes, setServerNotes] = useState<string[]>([]);
+  const [intent, setIntent] = useState<SearchIntent | null>(null);
+  const [nlFilters, setNlFilters] = useState<Record<string, string | number | null>>({});
+
+  const isLoading = status === "loading";
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [sort, setSort] = useState<SortKey>("match");
@@ -59,16 +107,26 @@ function SearchResultsInner() {
 
   // ── Fetch from /api/hospitals ─────────────────────────────────────────────
   const fetchHospitals = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setStatus("loading");
+    setFailure(null);
+    setServerNotes([]);
+
+    // One controller for the whole search, so navigating away or a stalled
+    // upstream can never leave this effect waiting forever.
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, NL_TIMEOUT_MS + HOSPITALS_TIMEOUT_MS + 2_000);
+
     try {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("q");
       params.delete("loc");
       params.delete("lat");
       params.delete("lon");
-
-      let fallbackCities: string[] = [];
+      params.delete("urgency");
 
       // Resolve the user's location from URL params or their saved location so it
       // can be sent with this request (and every subsequent search).
@@ -81,61 +139,85 @@ function SearchResultsInner() {
         urlLoc && urlLoc !== "skip" ? urlLoc : storedLoc?.label ?? null;
 
       if (rawQuery) {
-        // Call natural language API
-        const nlRes = await fetch("/api/search/natural-language", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: rawQuery,
-            locationContext: effectiveLoc
-          })
-        });
+        // ── Natural-language structuring ───────────────────────────────────
+        // The route returns a typed intent plus explicit notices about anything
+        // it could not resolve. A failure here is not fatal: the search still
+        // runs on the URL filters and the reason is shown to the user.
+        try {
+          const nlRes = await fetchWithTimeout(
+            "/api/search/natural-language",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: rawQuery, locationContext: effectiveLoc }),
+              signal: controller.signal,
+            },
+            NL_TIMEOUT_MS
+          );
 
+          if (nlRes.ok) {
+            const nlData = (await nlRes.json()) as NlResponse;
+            setIntent(nlData.intent);
+            setNotices(nlData.notices ?? []);
+            setExplanation({
+              query: rawQuery,
+              chips: nlData.chips ?? intentToChips(nlData.intent),
+            });
 
-        if (nlRes.ok) {
-          const nlData = await nlRes.json();
-          setExplanation(nlData.explanation);
+            // A "near me" query with no location yet needs the consent prompt.
+            const wantsLocation =
+              nlData.explanation.wantsNearby && !effectiveLoc && !nlData.intent.location.value;
 
-          // Detect location-intent queries that need geolocation
-          const queryLower = rawQuery.toLowerCase();
-          const needsLocation = (queryLower.includes("near me") || queryLower.includes("nearby") || queryLower.includes("closest") || queryLower.includes("nearest")) && !effectiveLoc && !nlData.filters.city;
+            if (wantsLocation) {
+              setPendingNlData(nlData);
+              setShowLocationPrompt(true);
+              setStatus("success"); // stop the spinner; the modal drives the next step
+              return; // Stop here — wait for the user to provide a location
+            }
 
-          if (needsLocation) {
-            setPendingNlData(nlData);
-            setShowLocationPrompt(true);
-            setIsLoading(false);
-            return; // Stop here — wait for user to provide location
+            // Only fields the intent actually resolved become filters.
+            for (const [key, value] of intentToQueryParams(nlData.intent)) {
+              params.set(key, value);
+            }
+            if (nlData.intent.sortBy.value) {
+              setSort(nlData.intent.sortBy.value as SortKey);
+            }
+
+            setNlFilters({
+              condition: nlData.intent.condition.value,
+              specialty: nlData.intent.specialty.value,
+              city: nlData.intent.location.value,
+              radius_km: nlData.intent.radiusKm.value,
+              min_budget: nlData.intent.budget.value?.min ?? null,
+              max_budget: nlData.intent.budget.value?.max ?? null,
+              facilities: nlData.intent.facilities.value?.join(",") ?? null,
+            });
+          } else {
+            setNotices([
+              {
+                id: "nl-failed",
+                severity: "info",
+                message:
+                  "We could not read your description automatically, so these results come from the filters already on the page.",
+              },
+            ]);
           }
-
-          if (nlData.filters.condition) params.set("condition", nlData.filters.condition);
-          if (nlData.filters.specialty) params.set("specialty", nlData.filters.specialty);
-          if (nlData.filters.city) params.set("city", nlData.filters.city);
-          if (nlData.filters.radius_km) params.set("radius_km", nlData.filters.radius_km.toString());
-          if (nlData.filters.min_budget) params.set("min_budget", nlData.filters.min_budget.toString());
-          if (nlData.filters.max_budget) params.set("max_budget", nlData.filters.max_budget.toString());
-          if (nlData.filters.facilities) params.set("facilities", nlData.filters.facilities);
-          if (nlData.filters.sort_by) {
-            setSort(nlData.filters.sort_by as SortKey);
-          }
-          if (Array.isArray(nlData.filters.fallback_cities)) {
-            fallbackCities = nlData.filters.fallback_cities;
-          }
-
-          // Store NL-extracted filters in state so activeFilters (and HospitalCard) can use them
-          setNlFilters({
-            condition: nlData.filters.condition ?? null,
-            specialty: nlData.filters.specialty ?? null,
-            city: nlData.filters.city ?? null,
-            radius_km: nlData.filters.radius_km ?? null,
-            min_budget: nlData.filters.min_budget ?? null,
-            max_budget: nlData.filters.max_budget ?? null,
-            facilities: nlData.filters.facilities ?? null,
-          });
+        } catch (err) {
+          console.warn("[search] natural-language structuring unavailable:", err);
+          setNotices([
+            {
+              id: "nl-failed",
+              severity: "info",
+              message: isTimeoutError(err)
+                ? "Reading your description took too long, so we fell back to the filters already on the page."
+                : "We could not read your description automatically, so these results come from the filters already on the page.",
+            },
+          ]);
         }
       }
 
       // Send the user's coordinates with every search request so "near me"
-      // searches match against hospital lat/lng and return nearest hospitals first.
+      // searches match against hospital lat/lng and return nearest hospitals.
       if (!locSkipped) {
         const coords =
           urlLat && urlLon
@@ -144,8 +226,8 @@ function SearchResultsInner() {
               ? { lat: String(storedLoc.lat), lon: String(storedLoc.lon) }
               : null;
 
-        // Only apply coordinates when the search isn't pinned to an explicit city name,
-        // otherwise the DB city-name match would be skipped for nothing.
+        // Only apply coordinates when the search isn't pinned to an explicit city
+        // name, otherwise the DB city-name match would be skipped for nothing.
         if (coords && !params.has("city")) {
           params.set("lat", coords.lat);
           params.set("lon", coords.lon);
@@ -154,45 +236,39 @@ function SearchResultsInner() {
       }
 
       const url = `/api/hospitals${params.toString() ? `?${params.toString()}` : ""}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const data: { hospitals: Hospital[]; count: number } = await res.json();
+      const res = await fetchWithTimeout(url, { signal: controller.signal }, HOSPITALS_TIMEOUT_MS);
+      if (!res.ok) throw new Error(`The hospitals service returned an error (${res.status}).`);
 
-      let finalData = data;
+      const data = (await res.json()) as HospitalsResponse;
+      setHospitals(data.hospitals ?? []);
+      setServerNotes(data.notes ?? []);
+      setStatus("success");
 
-      // Fallback if location filter is too restrictive
-      if (data.hospitals.length === 0 && params.has("city")) {
-        // If we have nearby fallback cities, try them!
-        if (fallbackCities.length > 0) {
-          console.warn(`No hospitals found in requested city. Fetching fallback cities: ${fallbackCities.join(", ")}`);
-          params.set("city", fallbackCities.join(","));
-
-          const fallbackUrl = `/api/hospitals${params.toString() ? `?${params.toString()}` : ""}`;
-          const fallbackRes = await fetch(fallbackUrl);
-          if (fallbackRes.ok) {
-            const fbData = await fallbackRes.json();
-            if (fbData.hospitals.length > 0) {
-              finalData = fbData;
-              // Inform the user via explanation chips that location was broadened
-              setExplanation((prev) => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  chips: prev.chips.map((c: any) =>
-                    c.label === "Location" ? { ...c, value: `${c.value} (Not found - Showing nearby: ${fallbackCities.join(", ")})` } : c
-                  )
-                };
-              });
-            }
-          }
-        }
+      // The API reports a widened search itself, so the client does not have to
+      // re-request with fallback cities and stitch two responses together.
+      if (data.relaxed) {
+        setNotices((prev) => [
+          ...prev.filter((n) => n.id !== "location-broadened"),
+          {
+            id: "location-broadened",
+            severity: "info" as const,
+            message:
+              "No hospital matched in the exact location you asked for, so we widened the search to nearby areas.",
+          },
+        ]);
       }
-
-      setHospitals(finalData.hospitals);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      if (timedOut || isTimeoutError(err)) {
+        setFailure(describeError(new RequestTimeoutError(NL_TIMEOUT_MS + HOSPITALS_TIMEOUT_MS)));
+        setStatus("error");
+      } else if (err instanceof Error && err.name === "AbortError") {
+        return; // Superseded by a newer run; leave state to that run.
+      } else {
+        setFailure(describeError(err, "Something went wrong loading results."));
+        setStatus("error");
+      }
     } finally {
-      setIsLoading(false);
+      clearTimeout(timer);
     }
   }, [rawQuery, searchParams]);
 
@@ -234,6 +310,50 @@ function SearchResultsInner() {
     }
   }, [hospitals, sort]);
 
+  /**
+   * Triage hands off here with `urgency=<severity>`. It is deliberately NOT sent
+   * to `/api/hospitals`: nothing in the dataset says how urgent a given hospital
+   * is for a given patient, so filtering on it would dress an arbitrary list up
+   * as a triage result. It is used only to warn the user.
+   */
+  const urgency = searchParams.get("urgency");
+  const triageNotices = useMemo<TransparencyNotice[]>(() => {
+    if (urgency === "emergency") {
+      return [
+        {
+          id: "triage-emergency",
+          severity: "warning",
+          message:
+            "Your symptom check flagged possible warning signs. The hospitals below are matched by specialty only \u2014 they are not ranked by how urgent your situation is. If this could be an emergency, call 108 or 112 now rather than choosing from a list.",
+        },
+      ];
+    }
+    if (urgency === "self_care") {
+      return [
+        {
+          id: "triage-self-care",
+          severity: "info",
+          message:
+            "Your symptom check suggested self-care may be enough. Hospitals are still listed below in case you would rather be seen.",
+        },
+      ];
+    }
+    return [];
+  }, [urgency]);
+
+  // Safety net: if the route could not report notices, derive them from the
+  // intent on the client so the "what we could not do" copy is never missing.
+  const effectiveNotices = useMemo<TransparencyNotice[]>(() => {
+    const derived =
+      notices.length > 0
+        ? notices
+        : intent
+          ? buildTransparencyNotices(rawQuery, intent)
+          : [];
+    const known = new Set(derived.map((n) => n.id));
+    return [...derived, ...triageNotices.filter((n) => !known.has(n.id))];
+  }, [notices, intent, rawQuery, triageNotices]);
+
   // hospitalNames map for the compare bar labels
   const hospitalNames = useMemo(
     () => Object.fromEntries(hospitals.map((h) => [h.hospitalId, h.name])),
@@ -265,7 +385,7 @@ function SearchResultsInner() {
   };
 
   const resultCount = sortedHospitals.length;
-  const showEmpty = !isLoading && !error && resultCount === 0;
+  const showEmpty = status === "success" && resultCount === 0;
 
   const activeFilters = useMemo(() => {
     // Merge URL params (manual filters) with NL-extracted filters (from natural-language query)
@@ -284,43 +404,45 @@ function SearchResultsInner() {
 
   // ── Location prompt handler ──────────────────────────────────────────────
   const handleLocationGrant = () => {
-    if (!navigator.geolocation) return;
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
+    getPositionWithDeadline(GEOLOCATION_TIMEOUT_MS, 10_000)
+      .then(async ({ lat: latitude, lon: longitude }) => {
+        let detectedCity = "";
         try {
-          const { latitude, longitude } = position.coords;
-          const res = await fetch(
+          // Reverse geocoding is best-effort: if it fails or names no city we
+          // still send the coordinates rather than stranding the user in the
+          // modal with a button that appears to do nothing.
+          const res = await fetchWithTimeout(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
-            { headers: { "User-Agent": "CuraNav/1.0" } }
+            { headers: { "User-Agent": "CuraNav/1.0" } },
+            3_000
           );
           const data = await res.json();
-          const detectedCity = data.address?.city ?? data.address?.town ?? data.address?.village ?? data.address?.county ?? "";
-          if (detectedCity) {
-            storeLocation({ lat: latitude, lon: longitude, label: detectedCity });
-            const currentUrl = new URL(window.location.href);
-            currentUrl.searchParams.set("loc", detectedCity);
-            currentUrl.searchParams.set("lat", latitude.toString());
-            currentUrl.searchParams.set("lon", longitude.toString());
-            setShowLocationPrompt(false);
-            setPendingNlData(null);
-            router.replace(currentUrl.pathname + currentUrl.search);
-          }
+          detectedCity =
+            data.address?.city ??
+            data.address?.town ??
+            data.address?.village ??
+            data.address?.county ??
+            "";
         } catch {
-          // Fall through — just continue without location
-          setShowLocationPrompt(false);
-          continueWithoutLocation();
-        } finally {
-          setLocating(false);
+          detectedCity = "";
         }
-      },
-      () => {
+
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set("loc", detectedCity || "Current location");
+        currentUrl.searchParams.set("lat", latitude.toString());
+        currentUrl.searchParams.set("lon", longitude.toString());
+        storeLocation({ lat: latitude, lon: longitude, label: detectedCity || "Current location" });
+        setShowLocationPrompt(false);
+        setPendingNlData(null);
+        setLocating(false);
+        router.replace(currentUrl.pathname + currentUrl.search);
+      })
+      .catch(() => {
         setLocating(false);
         setShowLocationPrompt(false);
         continueWithoutLocation();
-      },
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
+      });
   };
 
   const continueWithoutLocation = useCallback(() => {
@@ -352,6 +474,13 @@ function SearchResultsInner() {
           <ExplainabilityPanel onEditSearch={handleEditSearch} explanation={explanation} />
         </section>
 
+        {/* Every deviation from the request is stated, not silently applied. */}
+        {!isLoading && (effectiveNotices.length > 0 || serverNotes.length > 0) && (
+          <section className="mb-6" aria-label="Search limitations">
+            <SearchNotices notices={effectiveNotices} serverNotes={serverNotes} />
+          </section>
+        )}
+
         {/* ── MANUAL FILTERS TOGGLE ── */}
         {showManualFilters && (
           <section className="mb-6" aria-label="Manual Filters">
@@ -360,7 +489,7 @@ function SearchResultsInner() {
         )}
 
         {/* ── 2. RESULTS TOOLBAR ── */}
-        {!isLoading && !error && (
+        {!isLoading && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
               <ListFilter className="w-4 h-4 text-slate-400" />
@@ -409,14 +538,12 @@ function SearchResultsInner() {
         {/* ── 3. RESULTS LIST ── */}
         {isLoading ? (
           <LoadingState />
-        ) : error ? (
-          <div className="card p-8 text-center space-y-4">
-            <p className="text-foreground font-semibold">Something went wrong loading results.</p>
-            <p className="text-sm text-slate-400">{error}</p>
-            <button onClick={fetchHospitals} className="btn-primary">
-              Retry
-            </button>
-          </div>
+        ) : failure ? (
+          <LoadErrorState
+            title="Something went wrong loading results"
+            failure={failure}
+            onRetry={fetchHospitals}
+          />
         ) : showEmpty ? (
           <EmptyState />
         ) : (

@@ -58,7 +58,10 @@ export const CLUSTERS: readonly Cluster[] = [
     ],
     patterns: [/\bchest\b[^.]{0,20}\b(pain|hurt|tight|pressure|heavy|discomfort)\b/],
     baseSeverity: "urgent",
-    specialties: ["Cardiology", "Cardiac Diagnostics"],
+    // Dataset values only. "Cardiac Diagnostics" is a *facility*, not a
+    // specialty, and a non-canonical entry here makes the search API discard the
+    // whole specialty filter.
+    specialties: ["Cardiology", "Cardio-Thoracic & Vascular Surgery"],
     careKeys: ["avoid_strenuous_activity", "log_symptoms"],
     followupQuestions: [
       "Does the pain spread to your left arm, jaw, neck or back?",
@@ -311,7 +314,7 @@ export const CLUSTERS: readonly Cluster[] = [
     ],
     patterns: [/\bperiods?\b/, /\bmenstrual\b/, /\bpelvic\b/, /\bpregnan(t|cy)?\b/, /\bpcos\b/],
     baseSeverity: "routine",
-    specialties: ["Obstetrics & Gynecology", "Antenatal Care"],
+    specialties: ["Obstetrics & Gynecology", "Obstetrics & Gynaecology"],
     careKeys: ["pelvic_rest", "warm_compress", "log_symptoms"],
     followupQuestions: [
       "Is the pain tied to your menstrual cycle?",
@@ -455,7 +458,7 @@ export const CLUSTERS: readonly Cluster[] = [
       /\bcan'?t sleep\b/,
     ],
     baseSeverity: "routine",
-    specialties: ["Psychiatry", "Psychological Assessment"],
+    specialties: ["Psychiatry", "Behavioral Health"],
     careKeys: ["log_symptoms", "avoid_triggers"],
     followupQuestions: [
       "How long has this been going on, and does it affect your work or studies?",
@@ -495,7 +498,7 @@ export const CLUSTERS: readonly Cluster[] = [
     label: "General feeling unwell",
     keywords: [],
     baseSeverity: "self_care",
-    specialties: ["General Medicine", "Primary Care"],
+    specialties: ["General Medicine", "Family Medicine"],
     careKeys: ["rest_hydration", "log_symptoms", "light_diet"],
     followupQuestions: [
       "When exactly did this start, and was it sudden or gradual?",

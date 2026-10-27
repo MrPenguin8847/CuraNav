@@ -6,8 +6,13 @@ import { Suspense } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { EmergencyHospitalCard } from "@/components/EmergencyHospitalCard";
+import { LoadErrorState } from "@/components/LoadErrorState";
 import { Hospital } from "@/lib/mockHospitals";
 import { getStoredLocation, storeLocation } from "@/lib/userLocation";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { describeError, type LoadFailure, type LoadStatus } from "@/lib/loadState";
+import { getPositionWithDeadline } from "@/lib/geolocation";
+import { EMERGENCY_SPECIALTIES } from "@/lib/specialties";
 import {
   Siren,
   Loader2,
@@ -25,8 +30,18 @@ type LocationState = {
   label: string | null;
 } | null;
 
-const EMERGENCY_SPECIALTIES =
-  "Emergency Medicine,Emergency Stabilization,Critical Care,Trauma Care";
+const HOSPITALS_TIMEOUT_MS = 12_000;
+
+/**
+ * How long we wait for the browser's location permission prompt before giving up
+ * and asking for a city instead.
+ *
+ * This has to be enforced by us, not by the `timeout` option passed to
+ * `getCurrentPosition`: that option only bounds the time spent *acquiring* a
+ * fix. While the permission dialog is open the callback has simply not fired
+ * yet, so the page sat on "Finding the nearest emergency care…" indefinitely.
+ */
+const GEOLOCATION_PROMPT_TIMEOUT_MS = 8_000;
 
 function EmergencyPageContent() {
   const searchParams = useSearchParams();
@@ -36,22 +51,29 @@ function EmergencyPageContent() {
   const [location, setLocation] = useState<LocationState>(null);
   const [cityInput, setCityInput] = useState("");
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
   const [askedForLocation, setAskedForLocation] = useState(false);
 
+  const isLoading = status === "loading";
+
   const fetchHospitals = useCallback(
     async (coords: { lat: number; lon: number } | null, city?: string | null) => {
-      setIsLoading(true);
-      setError(null);
+      setStatus("loading");
+      setFailure(null);
       setUsedFallback(false);
       try {
         const params = new URLSearchParams();
-        // "Emergency Room Packages" does not exist in the dataset. These are
-        // the real emergency-capable specialty values.
-        params.set("specialty", EMERGENCY_SPECIALTIES);
+        // The verified emergency-capable values. This list used to contain
+        // "Emergency Stabilization", which does not exist in the dataset, and
+        // omitted "Emergency Room Packages", which covers 25 approved hospitals.
+        // Because the invalid value made the whole string unresolvable, the
+        // specialty filter was silently dropped and this page listed arbitrary
+        // hospitals rather than emergency-capable ones.
+        params.set("specialty", EMERGENCY_SPECIALTIES.join(","));
         params.set("radius_km", "120");
+        params.set("sort", "distance");
 
         if (coords) {
           params.set("lat", coords.lat.toString());
@@ -60,8 +82,8 @@ function EmergencyPageContent() {
           params.set("city", city.trim());
         }
 
-        let res = await fetch(`/api/hospitals?${params.toString()}`);
-        if (!res.ok) throw new Error(`API error ${res.status}`);
+        let res = await fetchWithTimeout(`/api/hospitals?${params.toString()}`, {}, HOSPITALS_TIMEOUT_MS);
+        if (!res.ok) throw new Error(`The hospitals service returned an error (${res.status}).`);
         let data = (await res.json()) as { hospitals: Hospital[] };
 
         // If a coordinate/city-based search finds nothing (hospitals without
@@ -69,8 +91,12 @@ function EmergencyPageContent() {
         // emergency-capable hospitals.
         if (data.hospitals.length === 0 && (coords || city?.trim())) {
           const fallbackParams = new URLSearchParams();
-          fallbackParams.set("specialty", EMERGENCY_SPECIALTIES);
-          res = await fetch(`/api/hospitals?${fallbackParams.toString()}`);
+          fallbackParams.set("specialty", EMERGENCY_SPECIALTIES.join(","));
+          res = await fetchWithTimeout(
+            `/api/hospitals?${fallbackParams.toString()}`,
+            {},
+            HOSPITALS_TIMEOUT_MS
+          );
           if (res.ok) {
             data = (await res.json()) as { hospitals: Hospital[] };
             if (data.hospitals.length > 0) setUsedFallback(true);
@@ -78,10 +104,10 @@ function EmergencyPageContent() {
         }
 
         setHospitals(data.hospitals.slice(0, 3));
+        setStatus("success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setIsLoading(false);
+        setFailure(describeError(err, "Something went wrong finding emergency care."));
+        setStatus("error");
       }
     },
     []
@@ -99,19 +125,24 @@ function EmergencyPageContent() {
 
     if (!navigator.geolocation) {
       setAskedForLocation(true);
-      setIsLoading(false);
+      setStatus("success");
       return;
     }
 
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
+    // Our own deadline on the permission prompt: a user who leaves the dialog
+    // open must not be stranded on a spinner, and the city form is a better
+    // fallback. `getPositionWithDeadline` enforces this for us.
+    getPositionWithDeadline(GEOLOCATION_PROMPT_TIMEOUT_MS, 10_000)
+      .then(async ({ lat: latitude, lon: longitude }) => {
         let label: string | null = null;
         try {
-          const res = await fetch(
+          // Reverse geocoding is a nice-to-have: a slow or unreachable
+          // Nominatim must not hold up the results.
+          const res = await fetchWithTimeout(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
-            { headers: { "User-Agent": "CuraNav/1.0" } }
+            { headers: { "User-Agent": "CuraNav/1.0" } },
+            3_000
           );
           const data = await res.json();
           label =
@@ -128,14 +159,12 @@ function EmergencyPageContent() {
         setLocation({ lat: latitude, lon: longitude, label });
         setLocating(false);
         fetchHospitals({ lat: latitude, lon: longitude });
-      },
-      () => {
+      })
+      .catch(() => {
         setLocating(false);
         setAskedForLocation(true);
-        setIsLoading(false);
-      },
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
+        setStatus("success");
+      });
   }, [fetchHospitals]);
 
   const handleCitySubmit = (e: React.FormEvent) => {
@@ -255,17 +284,13 @@ function EmergencyPageContent() {
         )}
 
         {/* ── Results ── */}
-        {error ? (
-          <div className="card p-8 text-center space-y-4">
-            <p className="text-foreground font-semibold">
-              Something went wrong finding emergency care.
-            </p>
-            <p className="text-sm text-slate-400">{error}</p>
-            <p className="text-sm text-muted-foreground">
-              Call <a href="tel:108" className="font-bold text-error">108</a> or{" "}
-              <a href="tel:112" className="font-bold text-error">112</a> for an ambulance.
-            </p>
-          </div>
+        {failure ? (
+          <LoadErrorState
+            title="Something went wrong finding emergency care"
+            failure={failure}
+            onRetry={() => fetchHospitals(location ? { lat: location.lat, lon: location.lon } : null, location?.label)}
+            showEmergencyNumbers
+          />
         ) : isLoading ? (
           <div className="space-y-4">
             {[0, 1].map((i) => (

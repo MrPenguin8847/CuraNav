@@ -2,21 +2,74 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createServerClient } from "@/lib/supabase-server";
 import { mapHospital } from "@/lib/mapHospital";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import {
-  normalizeExplicitSpecialty,
-  normalizeFacilities,
-  resolveSpecialtyHint,
-} from "@/lib/specialties";
+  hasExactMatches,
+  scoreAll,
+  sortHospitalsByRelevance,
+  type MatchStage,
+} from "@/lib/hospitalRelevance";
+import { normalizeExplicitSpecialty, normalizeFacilities } from "@/lib/specialties";
 
-// Helper for demo coordinate resolution
+// Approximate centroids for every city in KNOWN_CITIES. Used for in-memory
+// radius filtering before falling back to Nominatim geocoding.
+// shortcut: coordinates are city centroids (~1-2 km accuracy), sufficient for
+// haversine distance filtering; upgrade to PostGIS if sub-km precision matters.
 const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
-  chandigarh: { lat: 30.7333, lon: 76.7794 },
-  mohali: { lat: 30.7046, lon: 76.7179 },
-  panchkula: { lat: 30.6942, lon: 76.8606 },
-  delhi: { lat: 28.7041, lon: 77.1025 },
-  mumbai: { lat: 19.0760, lon: 72.8777 },
-  bangalore: { lat: 12.9716, lon: 77.5946 }
+  ambala:          { lat: 30.3782, lon: 76.7767 },
+  amritsar:        { lat: 31.6340, lon: 74.8723 },
+  "bawani khera":  { lat: 29.5900, lon: 75.8500 },
+  bharatpur:       { lat: 27.2152, lon: 77.4900 },
+  bhilwara:        { lat: 25.3500, lon: 74.6300 },
+  bhiwani:         { lat: 28.7975, lon: 76.1322 },
+  bilaspur:        { lat: 31.3390, lon: 76.7540 },
+  chamba:          { lat: 32.5534, lon: 76.1258 },
+  chandigarh:      { lat: 30.7333, lon: 76.7794 },
+  "charkhi dadri": { lat: 28.5921, lon: 76.2699 },
+  chowari:         { lat: 32.4500, lon: 76.1000 },
+  deorala:         { lat: 27.9300, lon: 75.2000 },
+  delhi:           { lat: 28.7041, lon: 77.1025 },
+  dharamsala:      { lat: 32.2190, lon: 76.3234 },
+  faridabad:       { lat: 28.4089, lon: 77.3178 },
+  fatehabad:       { lat: 29.5163, lon: 75.4536 },
+  ghumarwin:       { lat: 31.4500, lon: 76.7100 },
+  hamirpur:        { lat: 31.6858, lon: 76.5215 },
+  hoshiarpur:      { lat: 31.5143, lon: 75.9115 },
+  jaipur:          { lat: 26.9124, lon: 75.7873 },
+  jalandhar:       { lat: 31.3260, lon: 75.5762 },
+  jammu:           { lat: 32.7266, lon: 74.8570 },
+  jodhpur:         { lat: 26.2389, lon: 73.0243 },
+  keylong:         { lat: 32.5800, lon: 77.0350 },
+  kota:            { lat: 25.2138, lon: 75.8648 },
+  kullu:           { lat: 31.9574, lon: 77.1096 },
+  loharu:          { lat: 28.4400, lon: 75.8100 },
+  ludhiana:        { lat: 30.9010, lon: 75.8573 },
+  mandi:           { lat: 31.7080, lon: 76.9320 },
+  nahan:           { lat: 30.5600, lon: 77.2970 },
+  naraingarh:      { lat: 30.4500, lon: 77.1000 },
+  nurpur:          { lat: 32.2942, lon: 75.8896 },
+  palampur:        { lat: 32.1100, lon: 76.5400 },
+  rampur:          { lat: 31.4500, lon: 77.6300 },
+  ratia:           { lat: 29.6900, lon: 75.5800 },
+  "reckong-peo":   { lat: 31.9200, lon: 78.2000 },
+  shimla:          { lat: 31.1048, lon: 77.1734 },
+  siwani:          { lat: 29.0900, lon: 76.0300 },
+  solan:           { lat: 30.9100, lon: 77.0950 },
+  srinagar:        { lat: 34.0837, lon: 74.7973 },
+  sundernagar:     { lat: 31.5300, lon: 76.8900 },
+  tohana:          { lat: 29.7000, lon: 75.9000 },
+  tosham:          { lat: 28.8800, lon: 75.9200 },
+  udaipur:         { lat: 24.5854, lon: 73.7125 },
+  una:             { lat: 31.4700, lon: 76.2700 },
+  // legacy aliases kept for backwards compat
+  mohali:          { lat: 30.7046, lon: 76.7179 },
+  panchkula:       { lat: 30.6942, lon: 76.8606 },
+  mumbai:          { lat: 19.0760, lon: 72.8777 },
+  bangalore:       { lat: 12.9716, lon: 77.5946 },
 };
+
+/** Nominatim is a free public service; never let it hold the response open. */
+const GEOCODE_TIMEOUT_MS = 3_000;
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // km
@@ -30,17 +83,39 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 /**
+ * Parses a budget param that may be a plain number ("50000") or a human amount
+ * ("3 lakh", "50k"). Returns null when it is not a number at all, so an
+ * unparseable value never becomes a filter that quietly empties the results.
+ */
+function parseBudgetParam(raw: string | null): number | null {
+  if (!raw) return null;
+  const m = raw.trim().toLowerCase().match(/(\d+(?:\.\d+)?)\s*(lakh|lac|l|k)?/);
+  if (!m) return null;
+  const amount = parseFloat(m[1]);
+  if (!Number.isFinite(amount)) return null;
+  if (m[2] === "k") return Math.round(amount * 1000);
+  if (m[2]) return Math.round(amount * 100000);
+  return Math.round(amount);
+}
+
+/**
  * GET /api/hospitals
  *
  * Query params (all optional):
- *   city           — exact match (case-insensitive)
- *   specialty      — array contains match against specialties[]
+ *   city           — matched against city/state/address (case-insensitive)
+ *   specialty      — comma-separated; normalised to real dataset values
  *   condition      — matched against condition_tag (case-insensitive substring)
- *   max_budget     — hospitals where cost_min <= max_budget
+ *   min_budget     — hospitals where cost_max >= min_budget
+ *   max_budget     — hospitals where cost_min <= max_budget, or PM-JAY empanelled
  *   facilities     — comma-separated list; each must be in facilities[]
  *   verified_only  — "true" to restrict to verification_status = 'verified'
+ *   sort           — "match" (default) | "cost" | "distance"
  *
- * Returns: { count: number, filters_applied: object, hospitals: Hospital[] }
+ * Returns: { count, filters_applied, relaxed, stage, hospitals, match_reasons }
+ *
+ * `relaxed` is true when a filter could not be satisfied and the results were
+ * broadened rather than emptied. The client surfaces that as a visible notice
+ * instead of showing a bare zero-result page.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -48,19 +123,20 @@ export async function GET(req: NextRequest) {
   const city = searchParams.get("city");
   const specialty = searchParams.get("specialty");
   const condition = searchParams.get("condition");
-  const minBudget = searchParams.get("min_budget");
-  const maxBudget = searchParams.get("max_budget");
+  const minBudgetRaw = searchParams.get("min_budget");
+  const maxBudgetRaw = searchParams.get("max_budget");
   const radiusKm = searchParams.get("radius_km");
   const latParam = searchParams.get("lat");
   const lonParam = searchParams.get("lon");
   const facilitiesParam = searchParams.get("facilities");
   const verifiedOnly = searchParams.get("verified_only") === "true";
+  const sortParam = searchParams.get("sort") ?? "match";
   const isAdmin = searchParams.get("admin") === "true";
 
   if (isAdmin) {
     const supabase = await createServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+
     if (authError || !user) {
       return NextResponse.json(
         { error: "Unauthorized access" },
@@ -69,12 +145,46 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const filtersApplied: Record<string, string | number | boolean | string[]> =
-    {};
+  const filtersApplied: Record<string, string | number | boolean | string[]> = {};
+  const notes: string[] = [];
+
+  // ── Specialty resolution ─────────────────────────────────────────────────
+  // An unrecognised specialty used to be forwarded to `overlaps()` verbatim,
+  // which matched nothing and returned an empty list with no explanation. Now an
+  // unresolved value simply stops being a filter, and the result is ranked.
+  const explicitSpecialty = normalizeExplicitSpecialty(specialty);
+  const resolvedSpecialty = explicitSpecialty;
+  if (specialty && !resolvedSpecialty) {
+    notes.push(
+      `"${specialty}" is not an indexed specialty, so it was not used as a filter; results are ranked by related clinical services.`
+    );
+  }
+
+  const specialtyList = resolvedSpecialty
+    ? resolvedSpecialty.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+  if (resolvedSpecialty) {
+    filtersApplied.specialty = specialtyList;
+  }
+
+  const minBudget = parseBudgetParam(minBudgetRaw);
+  const maxBudget = parseBudgetParam(maxBudgetRaw);
+
+  // `normalizeFacilities` returns null when nothing the user asked for exists in
+  // the dataset. In that case the filter is skipped and the omission is
+  // reported, rather than applied as a no-op that empties the results.
+  const facilities = normalizeFacilities(facilitiesParam);
+  if (facilities && facilities.length > 0) {
+    filtersApplied.facilities = facilities;
+  } else if (facilitiesParam) {
+    notes.push(
+      `None of the requested facilities (${facilitiesParam}) are recorded in our dataset, so that filter was skipped.`
+    );
+  }
 
   // Reusable query builder so the relaxed radius fallback can re-apply the same
   // specialty/condition/budget filters without the city-name text match.
-  const buildQuery = () => {
+  const buildQuery = (options: { includeCity: boolean; cityText: string | null }) => {
     let q = supabaseAdmin.from("hospitals").select("*");
 
     // Only show approved hospitals unless accessing as admin
@@ -82,45 +192,30 @@ export async function GET(req: NextRequest) {
       q = q.eq("review_status", "approved");
     }
 
-    if (resolvedSpecialty && condition) {
-      const specs = resolvedSpecialty.split(',').map(s => `"${s.trim()}"`).join(',');
+    if (specialtyList.length > 0 && condition) {
+      const specs = specialtyList.map((s) => `"${s}"`).join(",");
       q = q.or(`specialties.ov.{${specs}},condition_tag.ilike.%${condition}%`);
-    } else if (resolvedSpecialty) {
-      const specs = resolvedSpecialty.split(',').map(s => s.trim()).filter(Boolean);
-      q = q.overlaps("specialties", specs);
+    } else if (specialtyList.length > 0) {
+      q = q.overlaps("specialties", specialtyList);
     } else if (condition) {
       q = q.ilike("condition_tag", `%${condition}%`);
     }
 
-    if (minBudget) {
-      let budget = parseInt(minBudget, 10);
-      const mStr = minBudget.toLowerCase();
-      if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
-        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
-      } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
-        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
-      }
-
-      if (!isNaN(budget)) {
-        q = q.gte("cost_max", budget);
-        filtersApplied.min_budget = budget;
-      }
+    if (facilities && facilities.length > 0) {
+      // `contains` with an array on a text[] column means "contains all", which
+      // is the semantics a user ticking three boxes expects.
+      q = q.contains("facilities", facilities);
     }
 
-    if (maxBudget) {
-      let budget = parseInt(maxBudget, 10);
-      const mStr = maxBudget.toLowerCase();
-      if (mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)) {
-        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/)![1]) * 100000);
-      } else if (mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)) {
-        budget = Math.round(parseFloat(mStr.match(/(\d+(?:\.\d+)?)\s*k\b/)![1]) * 1000);
-      }
+    if (minBudget != null) {
+      q = q.gte("cost_max", minBudget);
+      filtersApplied.min_budget = minBudget;
+    }
 
-      if (!isNaN(budget)) {
-        // Also match PMJAY hospitals where cost is subsidized (often null cost_min)
-        q = q.or(`cost_min.lte.${budget},pmjay_empanelled.eq.true`);
-        filtersApplied.max_budget = budget;
-      }
+    if (maxBudget != null) {
+      // Also match PMJAY hospitals where cost is subsidized (often null cost_min)
+      q = q.or(`cost_min.lte.${maxBudget},pmjay_empanelled.eq.true`);
+      filtersApplied.max_budget = maxBudget;
     }
 
     if (verifiedOnly) {
@@ -128,73 +223,43 @@ export async function GET(req: NextRequest) {
       filtersApplied.verified_only = true;
     }
 
-    return q;
-  };
-
-  // Fallback mapping so natural-language terms resolve to real dataset
-  // specialties. An explicit `specialty` param is trusted as-is when every
-  // comma-separated part already exists in the dataset, so callers such as the
-  // symptom checker are never clobbered by the fuzzy hints below.
-  const explicitSpecialty = normalizeExplicitSpecialty(specialty);
-  let resolvedSpecialty = explicitSpecialty ?? specialty;
-  if (!explicitSpecialty) {
-    const searchStr = `${specialty || ""} ${condition || ""} ${facilitiesParam || ""}`.toLowerCase();
-    resolvedSpecialty = resolveSpecialtyHint(searchStr) ?? specialty;
-  }
-
-  let query = buildQuery();
-
-  if (city) {
-    // If the destination is "India", return all hospitals by skipping the city filter
-    const lowerCity = city.trim().toLowerCase();
-    const isWholeCountry = lowerCity === "india" || lowerCity === "bharat";
-
-    if (!isWholeCountry && !radiusKm && !latParam && !lonParam) {
+    if (options.includeCity && options.cityText) {
       // Smarter location matching: ignore stop words and match any significant word
       const stopWords = ["in", "near", "at", "of", "the", "city", "village", "town", "district"];
-      const locationWords = city
+      const locationWords = options.cityText
         .toLowerCase()
         .split(/[\s,]+/)
-        .filter(w => w.length > 2 && !stopWords.includes(w));
+        .filter((w) => w.length > 2 && !stopWords.includes(w));
 
       if (locationWords.length > 0) {
-        const conditions = locationWords.flatMap(w => [
+        const conditions = locationWords.flatMap((w) => [
           `city.ilike.%${w}%`,
           `state.ilike.%${w}%`,
           `address.ilike.%${w}%`
         ]);
-        query = query.or(conditions.join(','));
+        q = q.or(conditions.join(","));
       } else {
         // Fallback to exact match if only short words
-        query = query.or(`city.ilike.%${city.trim()}%,state.ilike.%${city.trim()}%,address.ilike.%${city.trim()}%`);
+        const t = options.cityText.trim();
+        q = q.or(`city.ilike.%${t}%,state.ilike.%${t}%,address.ilike.%${t}%`);
       }
     }
-    filtersApplied.city = city;
-  }
 
-  if (resolvedSpecialty) {
-    filtersApplied.specialty = resolvedSpecialty;
-  }
-  if (condition) {
-    filtersApplied.condition = condition;
-  }
+    return q;
+  };
 
-  const facilities = normalizeFacilities(facilitiesParam);
-  if (facilities) {
-    // Only apply the filter when every requested value exists in the dataset,
-    // so we never report a filter as applied that silently did nothing.
-    if (facilities.length > 0) {
-      query = query.contains("facilities", facilities);
-      filtersApplied.facilities = facilities;
-    }
-  }
+  const useCityFilter = Boolean(
+    city && !radiusKm && !latParam && !lonParam && !isWholeCountry(city)
+  );
 
-  // Default ordering: verification confidence first, then cost ascending
-  query = query
-    .order("verification_status", { ascending: true })
-    .order("cost_min", { ascending: true });
+  const orderAndRun = async (includeCity: boolean) => {
+    const q = buildQuery({ includeCity, cityText: city })
+      .order("verification_status", { ascending: true })
+      .order("cost_min", { ascending: true });
+    return await q;
+  };
 
-  const { data, error } = await query;
+  let { data, error } = await orderAndRun(useCityFilter);
 
   if (error) {
     console.error("[GET /api/hospitals] Supabase error:", error.message);
@@ -205,6 +270,13 @@ export async function GET(req: NextRequest) {
   }
 
   let hospitals = (data ?? []).map(mapHospital);
+
+  if (city && !isWholeCountry(city)) {
+    filtersApplied.city = city;
+  }
+  if (condition) {
+    filtersApplied.condition = condition;
+  }
 
   // Handle geographical radius filtering in memory
   let coords: { lat: number; lon: number } | null = null;
@@ -219,7 +291,7 @@ export async function GET(req: NextRequest) {
 
   if (coords && !isNaN(coords.lat) && !isNaN(coords.lon) && !isNaN(radius)) {
     filtersApplied.radius_km = radius;
-    
+
     hospitals = hospitals.map(h => {
       if (h.latitude && h.longitude) {
         const dist = haversine(coords!.lat, coords!.lon, h.latitude, h.longitude);
@@ -236,12 +308,16 @@ export async function GET(req: NextRequest) {
   // This surfaces nearby regional hospitals that actually match the condition
   // (e.g. kidney hospitals in Ludhiana/Jalandhar for a Chandigarh search) and
   // also covers cities already present in CITY_COORDS.
-  if (hospitals.length === 0 && city) {
+  let relaxed = false;
+  if (hospitals.length === 0 && city && !isWholeCountry(city)) {
     if (!coords || Number.isNaN(coords.lat) || Number.isNaN(coords.lon)) {
+      // Geocode with a hard deadline: a stalled Nominatim used to hang the whole
+      // request until the platform killed the function.
       try {
-        const geocodeRes = await fetch(
+        const geocodeRes = await fetchWithTimeout(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&countrycodes=in`,
-          { headers: { "User-Agent": "CuraNav/1.0 (https://curanav.vercel.app)" } }
+          { headers: { "User-Agent": "CuraNav/1.0 (https://curanav.vercel.app)" } },
+          GEOCODE_TIMEOUT_MS
         );
         if (geocodeRes.ok) {
           const geocodeData = await geocodeRes.json();
@@ -255,7 +331,8 @@ export async function GET(req: NextRequest) {
           }
         }
       } catch {
-        // Geocoding failed silently — return empty results
+        // Geocoding unavailable — keep the empty result and say so.
+        notes.push(`We could not look up the coordinates for ${city} right now.`);
       }
     }
 
@@ -263,11 +340,10 @@ export async function GET(req: NextRequest) {
       // Wider regional radius so nearby district hospitals still appear
       const geoRadius = radiusKm ? parseFloat(radiusKm) : 150;
       if (!isNaN(geoRadius) && geoRadius > 0) {
-        const retryQuery = buildQuery()
-          .order("verification_status", { ascending: true })
-          .order("cost_min", { ascending: true });
-
-        const { data: retryData } = await retryQuery;
+        const { data: retryData, error: retryError } = await orderAndRun(false);
+        if (retryError) {
+          console.error("[GET /api/hospitals] relaxed query error:", retryError.message);
+        }
         if (retryData && retryData.length > 0) {
           hospitals = retryData.map(mapHospital).map(h => {
             if (h.latitude && h.longitude) {
@@ -278,37 +354,73 @@ export async function GET(req: NextRequest) {
           }).filter(h => h.distance_km !== undefined && h.distance_km <= geoRadius);
 
           if (hospitals.length > 0) {
-            filtersApplied.geocoded = true;
+            relaxed = true;
             filtersApplied.radius_km = geoRadius;
+            notes.push(
+              `No hospital matched in ${city} itself, so we widened the search to within ${geoRadius} km.`
+            );
           }
         }
       }
     }
   }
 
-  // ── Sort: nearest-first when we have coordinates, else by success rate ────
-  if (coords && !isNaN(coords.lat) && !isNaN(coords.lon)) {
+  // ── Ranking ──────────────────────────────────────────────────────────────
+  // Ranking always runs, even when the database already filtered, because the
+  // score doubles as the "why am I seeing this" explanation.
+  const relevance = scoreAll(hospitals, {
+    specialties: specialtyList,
+    minBudget,
+    maxBudget,
+  });
+
+  let stage: MatchStage = specialtyList.length === 0 ? "unfiltered" : "exact";
+  if (specialtyList.length > 0 && !hasExactMatches(relevance)) {
+    const anyRelated = [...relevance.values()].some((r) => r.stage === "related");
+    stage = anyRelated ? "related" : "unfiltered";
+  }
+
+  if (sortParam === "cost") {
+    hospitals = [...hospitals].sort((a, b) => {
+      const av = typeof a.costMin === "number" ? a.costMin : Infinity;
+      const bv = typeof b.costMin === "number" ? b.costMin : Infinity;
+      return av - bv;
+    });
+  } else if (sortParam === "distance" && coords) {
     // Show the nearest hospitals at the top ("near me" / radius searches)
-    hospitals.sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
-  } else if (resolvedSpecialty) {
-    const targetSpecs = resolvedSpecialty.split(',').map(s => s.trim()).filter(Boolean);
-    if (targetSpecs.length > 0) {
-      hospitals.sort((a, b) => {
-        const maxRateA = Math.max(0, ...targetSpecs.map(spec => a.successRates?.[spec] ?? 0));
-        const maxRateB = Math.max(0, ...targetSpecs.map(spec => b.successRates?.[spec] ?? 0));
-        if (maxRateB !== maxRateA) {
-          return maxRateB - maxRateA; // descending
-        }
-        return 0;
-      });
+    hospitals = [...hospitals].sort(
+      (a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity)
+    );
+  } else {
+    hospitals = sortHospitalsByRelevance(hospitals, relevance);
+  }
+
+  const matchReasons: Record<string, { score: number; stage: MatchStage; explanation: string }> = {};
+  for (const hospital of hospitals) {
+    const rel = relevance.get(hospital.hospitalId);
+    if (rel) {
+      matchReasons[hospital.hospitalId] = {
+        score: rel.score,
+        stage: rel.stage,
+        explanation: rel.explanation,
+      };
     }
   }
 
   return NextResponse.json({
     count: hospitals.length,
     filters_applied: filtersApplied,
+    relaxed,
+    stage,
+    notes,
+    match_reasons: matchReasons,
     hospitals,
   });
+}
+
+function isWholeCountry(city: string): boolean {
+  const lower = city.trim().toLowerCase();
+  return lower === "india" || lower === "bharat";
 }
 
 export async function POST(req: NextRequest) {

@@ -1,7 +1,49 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
+import { supabaseAdmin } from "@/lib/supabase";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import {
+  KNOWN_CITIES,
+  KNOWN_CITY_KEYS,
+  buildSearchIntent,
+  buildTransparencyNotices,
+  extractBudgetFromText,
+  intentToChips,
+  resolveSpecialtyField,
+  type RawExtraction,
+} from "@/lib/searchIntent";
+import { CANONICAL_SPECIALTIES, resolveSpecialtyFromText } from "@/lib/specialties";
 
-// ── Custom Errors ─────────────────────────────────────────────────────────────
+/**
+ * Natural-language search structuring.
+ *
+ * Two things this route used to do badly, and both showed up as "the search
+ * spinner never stops":
+ *
+ * 1. No deadline anywhere. Up to four providers, each with four attempts, each
+ *    with an unbounded `fetch` and backoff sleeps between them. A provider that
+ *    accepted the connection and stalled could hold the request open for
+ *    minutes, and the browser waited the whole time. There is now one total
+ *    budget for the whole waterfall, plus a per-request timeout, so the route
+ *    always answers.
+ *
+ * 2. The local fallback was wrong about clinical specialties. It mapped kidney
+ *    disease to "General Medicine" and cancer to "General Surgery", and knew
+ *    only 5 of the 45 cities in the dataset. Those wrong values were then used
+ *    as hard database filters, which is why some searches returned nothing.
+ *    The local layer is now built on the shared synonym list, and it always
+ *    runs — as a floor the model output has to beat, not just a last resort.
+ */
+
+/** Total budget for the entire provider waterfall. */
+const TOTAL_BUDGET_MS = 6_000;
+/** Per-request timeout inside the waterfall. */
+const PROVIDER_TIMEOUT_MS = 4_000;
+/** One retry, not three: a slow provider should not consume the whole budget. */
+const RETRY_DELAYS = [400];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 class JsonParseError extends Error {
   constructor(message: string) {
     super(message);
@@ -16,99 +58,83 @@ class ValidationError extends Error {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+/** True once we learn the log table is absent, so we stop retrying every query. */
+let searchLogUnavailable = false;
 
-/**
- * Safely removes markdown code fences and parses JSON.
- */
-function parseModelJson(content: string): any {
+/* ── Model helpers ──────────────────────────────────────────────────────────── */
+
+function parseModelJson(content: string): unknown {
   let cleaned = content.trim();
-  
-  // Remove markdown json fences if the model erroneously included them
-  if (cleaned.startsWith("```json")) {
-    cleaned = cleaned.substring(7);
-  } else if (cleaned.startsWith("```")) {
-    cleaned = cleaned.substring(3);
-  }
-  
-  if (cleaned.endsWith("```")) {
-    cleaned = cleaned.substring(0, cleaned.length - 3);
-  }
-  
+
+  if (cleaned.startsWith("```json")) cleaned = cleaned.substring(7);
+  else if (cleaned.startsWith("```")) cleaned = cleaned.substring(3);
+  if (cleaned.endsWith("```")) cleaned = cleaned.slice(0, -3);
   cleaned = cleaned.trim();
 
   try {
     return JSON.parse(cleaned);
-  } catch (err: any) {
-    // Log safely truncated version of the invalid content
-    const truncated = content.length > 200 ? content.substring(0, 200) + "..." : content;
-    console.error(`[AI Parser] Invalid JSON returned. Content snippet: ${truncated}`);
-    throw new JsonParseError("AI returned malformed JSON");
+  } catch {
+    const truncated = content.length > 200 ? `${content.slice(0, 200)}…` : content;
+    console.error(`[AI Parser] Invalid JSON. Snippet: ${truncated}`);
+    throw new JsonParseError("Model returned malformed JSON");
   }
 }
 
 /**
- * Validates the parsed JSON against the expected schema.
+ * Coerces whatever the model produced into a `RawExtraction`. Anything missing
+ * or the wrong type becomes null rather than failing the whole request — a
+ * partially-valid extraction is far more useful to the user than an error.
  */
-function validateResponseSchema(data: any): any {
+function coerceExtraction(data: unknown): RawExtraction {
   if (!data || typeof data !== "object") {
     throw new ValidationError("Root response must be an object");
   }
-
-  // Validate filters
-  if (!data.filters || typeof data.filters !== "object") {
+  const root = data as Record<string, unknown>;
+  const f = (root.filters ?? root) as Record<string, unknown>;
+  if (typeof f !== "object" || f === null) {
     throw new ValidationError("Missing or invalid 'filters' object");
   }
 
-  const f = data.filters;
-  const condition = f.condition ?? null;
-  const specialty = f.specialty ?? null;
-  const city = f.city ?? null;
-  const radius_km = typeof f.radius_km === "number" ? f.radius_km : null;
-  const min_budget = typeof f.min_budget === "number" ? f.min_budget : null;
-  const max_budget = typeof f.max_budget === "number" ? f.max_budget : null;
-  const facilities = f.facilities ?? null;
-  const sort_by = typeof f.sort_by === "string" ? f.sort_by : null;
-  const fallback_cities = Array.isArray(f.fallback_cities) ? f.fallback_cities : null;
-
-  // Validate chips
-  const chips: Array<{ icon: string; label: string; value: string }> = [];
-  if (Array.isArray(data.chips)) {
-    for (const c of data.chips) {
-      if (c && typeof c === "object" && typeof c.icon === "string" && typeof c.label === "string" && typeof c.value === "string") {
-        chips.push({ icon: c.icon, label: c.label, value: c.value });
-      }
-    }
-  }
+  const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
   return {
-    filters: { condition, specialty, city, radius_km, fallback_cities, min_budget, max_budget, facilities, sort_by },
-    chips
+    condition: str(f.condition),
+    specialty: str(f.specialty),
+    city: str(f.city),
+    radius_km: num(f.radius_km),
+    min_budget: num(f.min_budget),
+    max_budget: num(f.max_budget),
+    facilities: str(f.facilities) ?? (Array.isArray(f.facilities) ? f.facilities.filter((x): x is string => typeof x === "string") : null),
+    sort_by: str(f.sort_by),
+    fallback_cities: Array.isArray(f.fallback_cities)
+      ? f.fallback_cities.filter((x): x is string => typeof x === "string")
+      : [],
   };
 }
 
-const RETRY_DELAYS = [500, 1500, 3000];
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** The indexed specialty vocabulary, injected into the prompt. */
+const CANONICAL_PROMPT = CANONICAL_SPECIALTIES.join(" | ");
 
 const SYSTEM_PROMPT = `You are a JSON extraction engine for a hospital search system. Given a user query, extract the search parameters.
 
 REQUIREMENTS:
 1. Return ONLY valid JSON.
-2. Do not return explanations, conversational text, or markdown code blocks (do not wrap in \`\`\`json).
+2. Do not return explanations, conversational text, or markdown code blocks.
 3. Do not add extra fields to the JSON.
 4. Use exactly \`null\` when information is not specified.
+5. Never invent information the user did not state. If they did not name a city, city must be null.
 
 Extract:
-- condition: the medical condition or disease (e.g. "kidney disease", "heart disease", "cancer"). Null if none.
-- specialty: the corresponding medical specialty or procedure (e.g. "Nephrology", "Cardiology", "kidney transplant"). Null if none.
+- condition: the medical condition or disease (e.g. "kidney disease"). Null if none.
+- specialty: the medical specialty. Prefer one of these indexed values when the query clearly indicates one: ${CANONICAL_PROMPT}. If none fits, use the closest clinical term. Null only if the query is not about a medical condition.
 - city: the city mentioned (e.g. "Chandigarh"). Null if none.
 - radius_km: the explicit distance radius in kilometers (e.g. "within 20 km" -> 20). Null if no explicit radius. Do not invent a radius for "near me".
 - fallback_cities: an array of 2-3 nearby major cities or districts geographically close to 'city'. Empty array if none.
 - min_budget: the minimum budget in Indian Rupees (INR) as an integer (e.g. "between 1 and 3 lakh" -> 100000). Null if none.
 - max_budget: the maximum budget in INR as an integer (e.g. "under 2 lakh" -> 200000). Null if none.
-- facilities: comma separated list of facilities (e.g. "Dialysis,ICU"). Null if none.
-- sort_by: sorting preference based on user language. Must be one of: "match", "cost" (for cheapest/affordable), "distance" (for closest/nearest), or "verified". Default is "match".
-- chips: an array of UI chips summarizing what was extracted. Each chip has { "icon", "label", "value" }. Use emojis: 🩺 Condition, 📍 Location, 📏 Distance (if radius_km), 💰 Budget, 🏥 Facilities, 🎯 Priority (for sort_by).
+- facilities: comma separated list (e.g. "Dialysis Unit,ICU"). Null if none.
+- sort_by: one of "match", "cost", "distance", "verified". Default "match".
 
 EXPECTED JSON SCHEMA:
 {
@@ -122,206 +148,86 @@ EXPECTED JSON SCHEMA:
     "max_budget": number | null,
     "facilities": string | null,
     "sort_by": string | null
-  },
-  "chips": [
-    { "icon": string, "label": string, "value": string }
-  ]
+  }
 }`;
 
-// ── AIML API call (Primary) ───────────────────────────────────────────────────
-async function callAimlApi(apiKey: string, query: string) {
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
-    try {
-      const res = await fetch("https://api.aimlapi.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: query }
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0,
-          max_tokens: 400,
-        }),
-      });
+/* ── Providers ──────────────────────────────────────────────────────────────── */
 
-      if (!res.ok) {
-        const errBody = await res.text();
-        const isTransient = [408, 429, 500, 502, 503, 504].includes(res.status);
-        
-        if (isTransient && attempt < RETRY_DELAYS.length) {
-          console.warn(`[AIML API] Attempt ${attempt + 1} - Transient error ${res.status}. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
-          await sleep(RETRY_DELAYS[attempt]);
-          continue;
-        }
-        throw new Error(`AIML API HTTP ${res.status}: ${errBody}`);
-      }
-
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) throw new Error("Empty response from AIML API");
-
-      const parsed = parseModelJson(content);
-      return validateResponseSchema(parsed);
-
-    } catch (err: unknown) {
-      if (err instanceof JsonParseError || err instanceof ValidationError) {
-        throw err;
-      }
-      
-      const errMsg = err instanceof Error ? err.message : String(err);
-      
-      if (attempt < RETRY_DELAYS.length && (errMsg.includes("fetch") || errMsg.includes("network"))) {
-        console.warn(`[AIML API] Attempt ${attempt + 1} - Network error. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
-        await sleep(RETRY_DELAYS[attempt]);
-        continue;
-      }
-      
-      if (attempt >= RETRY_DELAYS.length) {
-        throw new Error(`AIML API failed after ${attempt} retries: ${errMsg}`);
-      }
-      
-      throw err;
-    }
-  }
+interface Provider {
+  name: string;
+  type: "openai-compatible" | "gemini";
+  key: string;
+  baseUrl: string;
+  model: string;
+  headers: Record<string, string>;
 }
 
-// ── OpenRouter API call ───────────────────────────────────────────────────────
-async function callOpenRouter(apiKey: string, query: string) {
+async function callOpenAiCompatible(
+  provider: Provider,
+  query: string,
+  remainingMs: () => number
+): Promise<RawExtraction> {
+  const lastError: unknown[] = [];
+
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    // Never start an attempt we cannot finish inside the total budget.
+    const budget = Math.min(PROVIDER_TIMEOUT_MS, remainingMs());
+    if (budget <= 500) break;
+
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://curanav.vercel.app",
-          "X-Title": "CuraNav",
+      const res = await fetchWithTimeout(
+        `${provider.baseUrl}/chat/completions`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${provider.key}`,
+            "Content-Type": "application/json",
+            ...provider.headers,
+          },
+          body: JSON.stringify({
+            model: provider.model,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: query },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0,
+            max_tokens: 300,
+          }),
         },
-        body: JSON.stringify({
-          model: "qwen/qwen3.8-27b:free",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: query }
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0,
-          max_tokens: 300,
-        }),
-      });
+        budget
+      );
 
       if (!res.ok) {
-        const errBody = await res.text();
-        const isTransient = [408, 429, 500, 502, 503, 504].includes(res.status);
-        
-        if (isTransient && attempt < RETRY_DELAYS.length) {
-          console.warn(`[OpenRouter] Attempt ${attempt + 1} - Transient error ${res.status}. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
-          await sleep(RETRY_DELAYS[attempt]);
-          continue;
-        }
-        throw new Error(`OpenRouter HTTP ${res.status}: ${errBody}`);
+        const body = await res.text();
+        throw new Error(`${provider.name} HTTP ${res.status}: ${body.slice(0, 200)}`);
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
       const content = data.choices?.[0]?.message?.content;
-      if (!content) throw new Error("Empty response from OpenRouter");
+      if (!content) throw new Error(`${provider.name} returned an empty response`);
 
-      const parsed = parseModelJson(content);
-      return validateResponseSchema(parsed);
-
-    } catch (err: unknown) {
-      // Do not retry deterministic errors (JSON parse, Validation, 400/403)
-      if (err instanceof JsonParseError || err instanceof ValidationError) {
-        throw err; // Fail fast to move to next provider
-      }
-      
-      const errMsg = err instanceof Error ? err.message : String(err);
-      
-      // Handle fetch network failures as transient
-      if (attempt < RETRY_DELAYS.length && (errMsg.includes("fetch") || errMsg.includes("network"))) {
-        console.warn(`[OpenRouter] Attempt ${attempt + 1} - Network error. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
-        await sleep(RETRY_DELAYS[attempt]);
-        continue;
-      }
-      
-      if (attempt >= RETRY_DELAYS.length) {
-        throw new Error(`OpenRouter failed after ${attempt} retries: ${errMsg}`);
-      }
-      
-      throw err;
+      return coerceExtraction(parseModelJson(content));
+    } catch (err) {
+      // A malformed answer is a bug in that provider, not a transient fault.
+      if (err instanceof JsonParseError || err instanceof ValidationError) throw err;
+      lastError.push(err);
+      if (attempt < RETRY_DELAYS.length) await sleep(RETRY_DELAYS[attempt]);
     }
   }
+
+  throw new Error(
+    `${provider.name} failed: ${lastError[lastError.length - 1] instanceof Error ? (lastError[lastError.length - 1] as Error).message : "unknown error"}`
+  );
 }
 
-// ── Groq API call ───────────────────────────────────────────────────────
-async function callGroq(apiKey: string, query: string) {
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-20b",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: query }
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0,
-        }),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        const isTransient = [408, 429, 500, 502, 503, 504].includes(res.status);
-        
-        if (isTransient && attempt < RETRY_DELAYS.length) {
-          console.warn(`[Groq] Attempt ${attempt + 1} - Transient error ${res.status}. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
-          await sleep(RETRY_DELAYS[attempt]);
-          continue;
-        }
-        throw new Error(`Groq HTTP ${res.status}: ${errBody}`);
-      }
-
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) throw new Error("Empty response from Groq");
-
-      const parsed = parseModelJson(content);
-      return validateResponseSchema(parsed);
-
-    } catch (err: unknown) {
-      if (err instanceof JsonParseError || err instanceof ValidationError) {
-        throw err;
-      }
-      
-      const errMsg = err instanceof Error ? err.message : String(err);
-      
-      if (attempt < RETRY_DELAYS.length && (errMsg.includes("fetch") || errMsg.includes("network"))) {
-        console.warn(`[Groq] Attempt ${attempt + 1} - Network error. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
-        await sleep(RETRY_DELAYS[attempt]);
-        continue;
-      }
-      
-      if (attempt >= RETRY_DELAYS.length) {
-        throw new Error(`Groq failed after ${attempt} retries: ${errMsg}`);
-      }
-      
-      throw err;
-    }
-  }
-}
-
-// ── Gemini SDK call ───────────────────────────────────────────────────────────
-async function callGemini(ai: GoogleGenAI, query: string) {
+async function callGemini(
+  provider: Provider,
+  query: string,
+  remainingMs: () => number
+): Promise<RawExtraction> {
   const schema = {
     type: Type.OBJECT,
     properties: {
@@ -336,206 +242,335 @@ async function callGemini(ai: GoogleGenAI, query: string) {
           min_budget: { type: Type.INTEGER, nullable: true },
           max_budget: { type: Type.INTEGER, nullable: true },
           facilities: { type: Type.STRING, nullable: true },
-          sort_by: { type: Type.STRING, nullable: true }
-        }
+          sort_by: { type: Type.STRING, nullable: true },
+        },
       },
-      chips: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            icon: { type: Type.STRING },
-            label: { type: Type.STRING },
-            value: { type: Type.STRING }
-          }
-        }
-      }
-    }
+    },
   };
 
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: `${SYSTEM_PROMPT}\n\nUser Query: "${query}"`,
-        config: { responseMimeType: "application/json", responseSchema: schema }
-      });
-      
-      const parsed = parseModelJson(response.text || "{}");
-      return validateResponseSchema(parsed);
-
-    } catch (err: unknown) {
-      if (err instanceof JsonParseError || err instanceof ValidationError) {
-        throw err; // Fail fast
-      }
-      
-      const errMsg = err instanceof Error ? err.message : String(err);
-      const isTransient = errMsg.includes("overloaded") || errMsg.includes("429") || errMsg.includes("503");
-      
-      if (isTransient && attempt < RETRY_DELAYS.length) {
-        console.warn(`[Gemini SDK] Attempt ${attempt + 1} - Transient error. Retrying in ${RETRY_DELAYS[attempt]}ms...`);
-        await sleep(RETRY_DELAYS[attempt]);
-        continue;
-      }
-      
-      throw err;
-    }
-  }
-}
-
-// ── Local fallback extraction (Regex) ─────────────────────────────────────────
-function localExtract(query: string) {
-  const q = query.toLowerCase();
-  let condition: string | null = null, specialty: string | null = null, city: string | null = null;
-  let min_budget: number | null = null, max_budget: number | null = null, radius_km: number | null = null;
-  let sort_by: string | null = null;
-  let facilities: string[] = [];
-
-  if (q.includes("kidney") || q.includes("nephro") || q.includes("dialysis") || q.includes("renal")) { condition = "kidney disease"; specialty = "General Medicine"; }
-  else if (q.includes("heart") || q.includes("cardiac") || q.includes("cardio") || q.includes("bypass")) { condition = "heart disease"; specialty = "Cardiology"; }
-  else if (q.includes("cancer") || q.includes("oncol") || q.includes("tumor") || q.includes("chemo")) { condition = "cancer"; specialty = "General Surgery"; }
-  else if (q.includes("bone") || q.includes("joint") || q.includes("ortho") || q.includes("fracture") || q.includes("spine")) { condition = "orthopaedic conditions"; specialty = "Orthopaedics"; }
-  else if (q.includes("pregnan") || q.includes("matern") || q.includes("delivery") || q.includes("women") || q.includes("gynae") || q.includes("gyne")) { condition = "maternity"; specialty = "Obstetrics & Gynaecology"; }
-  else if (q.includes("emergency") || q.includes("trauma") || q.includes("accident")) { condition = "emergency care"; specialty = "Emergency Room Packages"; }
-  else if (q.includes("neuro") || q.includes("brain") || q.includes("stroke")) { condition = "neurological conditions"; specialty = "Neurosurgery"; }
-  else if (q.includes("burn")) { condition = "burns"; specialty = "Burns Management"; }
-  else if (q.includes("eye") || q.includes("cataract") || q.includes("vision") || q.includes("ophthal")) { condition = "eye care"; specialty = "Ophthalmology"; }
-  else if (q.includes("ear") || q.includes("nose") || q.includes("throat") || q.includes("ent") || q.includes("sinus")) { condition = "ENT conditions"; specialty = "Otorhinolaryngology (ENT)"; }
-  else if (q.includes("urin") || q.includes("urolog") || q.includes("prostate") || q.includes("bladder")) { condition = "urological conditions"; specialty = "Urology"; }
-  else if (q.includes("child") || q.includes("pediatr") || q.includes("paediatr") || q.includes("baby") || q.includes("infant") || q.includes("neonat")) { condition = "pediatric care"; specialty = "Paediatric Medical Management"; }
-  else if (q.includes("plastic") || q.includes("cosmetic") || q.includes("reconstruct")) { condition = "reconstructive surgery"; specialty = "Plastic & Reconstructive Surgery"; }
-  else if (q.includes("surgery") || q.includes("surgical") || q.includes("operation")) { condition = "surgical needs"; specialty = "General Surgery"; }
-  else if (q.includes("general") || q.includes("fever") || q.includes("check up") || q.includes("checkup")) { condition = "general care"; specialty = "General Medicine"; }
-
-  const cities = ["chandigarh", "mohali", "delhi", "mumbai", "bangalore"];
-  const foundCity = cities.find((c) => q.includes(c));
-  if (foundCity) city = foundCity.charAt(0).toUpperCase() + foundCity.slice(1);
-
-  // Extract Radius
-  const radiusMatch = q.match(/within\s*(\d+)\s*km/i);
-  if (radiusMatch) radius_km = parseInt(radiusMatch[1], 10);
-
-  // Extract Budgets
-  const betweenMatch = q.match(/between\s*(?:₹|rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)?\s*and\s*(?:₹|rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/i);
-  if (betweenMatch) {
-    min_budget = Math.round(parseFloat(betweenMatch[1]) * 100000);
-    max_budget = Math.round(parseFloat(betweenMatch[2]) * 100000);
-  } else {
-    const lakhMatch = q.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l\b)/i);
-    const kMatch = q.match(/(\d+(?:\.\d+)?)\s*k\b/i);
-    const exactMatch = q.match(/(?:under|below|max(?:imum)?)\s*(?:₹|rs\.?)?\s*(\d{4,})/i);
-
-    if (lakhMatch) max_budget = Math.round(parseFloat(lakhMatch[1]) * 100000);
-    else if (kMatch) max_budget = Math.round(parseFloat(kMatch[1]) * 1000);
-    else if (exactMatch) max_budget = parseInt(exactMatch[1], 10);
-  }
-
-  if (q.includes("dialysis")) facilities.push("Dialysis");
-  if (q.includes("icu") || q.includes("emergency")) facilities.push("ICU");
-
-  // Extract Sort By
-  if (q.includes("closest") || q.includes("nearest") || q.includes("prioritize distance")) sort_by = "distance";
-  else if (q.includes("cheapest") || q.includes("affordable") || q.includes("prioritize cost")) sort_by = "cost";
-
-  const chips = [];
-  if (condition) chips.push({ icon: "🩺", label: "Condition", value: condition });
-  if (specialty) chips.push({ icon: "⚕️", label: "Specialty", value: specialty });
-  if (city) chips.push({ icon: "📍", label: "Location", value: city });
-  if (radius_km) chips.push({ icon: "📏", label: "Distance", value: `Within ${radius_km} km` });
-  
-  if (min_budget && max_budget) chips.push({ icon: "💰", label: "Budget", value: `₹${min_budget} - ₹${max_budget}` });
-  else if (max_budget) chips.push({ icon: "💰", label: "Budget", value: `Under ₹${max_budget}` });
-  
-  if (facilities.length > 0) chips.push({ icon: "🏥", label: "Facilities", value: facilities.join(", ") });
-  
-  if (sort_by === "distance") chips.push({ icon: "🎯", label: "Priority", value: "Distance" });
-  else if (sort_by === "cost") chips.push({ icon: "🎯", label: "Priority", value: "Cost" });
-  else chips.push({ icon: "🎯", label: "Priority", value: "Best match" });
-
-  return { filters: { condition, specialty, city, radius_km, fallback_cities: [], min_budget, max_budget, facilities: facilities.length > 0 ? facilities.join(",") : null, sort_by }, chips };
-}
-
-// ── Main handler ──────────────────────────────────────────────────────────────
-export async function POST(req: Request) {
+  // The SDK has no signal option, so bound it with a race. The timer is always
+  // cleared, otherwise every call would keep the process alive for 4s.
+  const ai = new GoogleGenAI({ apiKey: provider.key });
+  // shortcut: timer must stay in the outer scope; if it moves into the try block
+  // the finally clause can no longer clear it on a network error.
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const { query, locationContext } = await req.json();
+    const work = ai.models.generateContent({
+      model: provider.model,
+      contents: `${SYSTEM_PROMPT}\n\nUser Query: "${query}"`,
+      config: { responseMimeType: "application/json", responseSchema: schema },
+    });
+    const guard = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${provider.name} exceeded ${PROVIDER_TIMEOUT_MS}ms`)),
+        Math.max(500, Math.min(PROVIDER_TIMEOUT_MS, remainingMs()))
+      );
+    });
+    const response = await Promise.race([work, guard]);
+    return coerceExtraction(parseModelJson(response.text || "{}"));
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/* ── Local extraction (always runs) ─────────────────────────────────────────── */
+
+// KNOWN_CITY_KEYS is imported from searchIntent — don't rebuild it here.
+// Pre-compile the per-city word-boundary regexes once so localExtract doesn't
+// recompile 45 patterns on every request.
+const CITY_PATTERNS: readonly [RegExp, string][] = KNOWN_CITIES.map((c) => [
+  new RegExp(`\\b${c.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`),
+  c,
+]);
+
+const RADIUS_RE = /within\s*(\d+)\s*(km|kilometre|kilometer)/i;
+const NEARBY_RE = /\b(near me|nearby|closest|nearest|around me|in my area)\b/i;
+const CHEAP_RE = /\b(cheapest|affordable|lowest cost|least expensive|budget friendly)\b/i;
+const CLOSE_RE = /\b(closest|nearest|nearby|near me|by distance)\b/i;
+const VERIFIED_RE = /\b(verified|trustworthy|reliable hospital|nabh)\b/i;
+
+/**
+ * Deterministic extraction from the shared synonym list.
+ *
+ * Always executed, never only on failure. The result is the floor: any field the
+ * model fails to produce — or produces unusably — falls back to this.
+ */
+function localExtract(query: string): RawExtraction {
+  const q = query.toLowerCase();
+
+  const hint = resolveSpecialtyFromText(query);
+  const specialty = hint ? hint.specialties : null;
+
+  let condition: string | null = null;
+  if (specialty) {
+    condition = hint ? hint.label : null;
+  }
+
+  // City: only cities we actually have hospitals in are worth filtering on.
+  let city: string | null = null;
+  for (const [re, canonical] of CITY_PATTERNS) {
+    if (re.test(q)) { city = canonical; break; }
+  }
+
+  const radiusMatch = q.match(RADIUS_RE);
+
+  const budget = extractBudgetFromText(query);
+
+  const facilities: string[] = [];
+  const facilityWords: Array<[RegExp, string]> = [
+    [/\b(icu|intensive care)\b/, "ICU"],
+    [/\b(nicu|neonatal intensive care|newborn intensive)\b/, "NICU"],
+    [/\b(dialysis|renal machine)\b/, "Dialysis Unit"],
+    [/\b(ambulance)\b/, "Ambulance"],
+    [/\b(blood bank)\b/, "Blood Bank"],
+    [/\b(cath lab|catheterisation lab|catheterization lab)\b/, "Cath Lab"],
+    [/\b(pharmacy|medicine store)\b/, "Pharmacy"],
+    [/\b(mri|ct scan|x-?ray|radiolog|imaging)\b/, "Radiology"],
+    [/\b(24x7 emergency|24\/7 emergency|emergency room)\b/, "24x7 Emergency"],
+    [/\b(operation theatre|operating theatre|ot facility|theatre)\b/, "Operation Theatre"],
+  ];
+  for (const [re, facility] of facilityWords) {
+    if (re.test(q)) facilities.push(facility);
+  }
+
+  let sort_by: string | null = null;
+  if (CLOSE_RE.test(q)) sort_by = "distance";
+  else if (CHEAP_RE.test(q)) sort_by = "cost";
+  else if (VERIFIED_RE.test(q)) sort_by = "verified";
+
+  return {
+    condition,
+    specialty,
+    city,
+    radius_km: radiusMatch ? parseInt(radiusMatch[1], 10) : null,
+    min_budget: budget.min,
+    max_budget: budget.max,
+    facilities: facilities.length > 0 ? facilities.join(",") : null,
+    sort_by,
+    fallback_cities: [],
+  };
+}
+
+/**
+ * Merges model output over the local floor.
+ *
+ * A model field only wins when it is usable: a specialty that reduces to a real
+ * dataset value, a non-empty string, a real number. A model that answers
+ * "kidney transplant" for a specialty must not be able to override a synonym
+ * list that already knows where to look.
+ */
+function mergeExtraction(local: RawExtraction, model: RawExtraction | null): RawExtraction {
+  if (!model) return { ...local, usedLocalFallback: true };
+
+  const specialty = (() => {
+    const fromModel = resolveSpecialtyField(model.specialty, "model");
+    if (fromModel.value && fromModel.confidence !== "low") {
+      return { specialty: fromModel.value };
+    }
+    const fromLocal = resolveSpecialtyField(local.specialty, "synonym");
+    return fromLocal.value
+      ? { specialty: fromLocal.value }
+      : model.specialty
+        ? { specialty: model.specialty }
+        : {};
+  })();
+
+  return {
+    condition: model.condition ?? local.condition,
+    specialty: specialty.specialty ?? local.specialty ?? null,
+    city: model.city ?? local.city,
+    radius_km: model.radius_km ?? local.radius_km,
+    min_budget: model.min_budget ?? local.min_budget,
+    max_budget: model.max_budget ?? local.max_budget,
+    facilities: model.facilities ?? local.facilities,
+    sort_by: model.sort_by ?? local.sort_by,
+    fallback_cities: model.fallback_cities?.length ? model.fallback_cities : local.fallback_cities,
+    usedLocalFallback: false,
+  };
+}
+
+/* ── Query logging (best effort) ────────────────────────────────────────────── */
+
+/**
+ * Records the queries we could not confidently structure, so the synonym list
+ * can be extended from real usage rather than guesswork.
+ *
+ * Best effort by design: a missing table must never fail a patient search, and
+ * once we know the table is absent we stop attempting it for the lifetime of the
+ * instance rather than paying a failed round-trip per query.
+ */
+async function logUnresolvedQuery(payload: {
+  query: string;
+  specialty: string | null;
+  specialtyConfidence: string;
+  specialtyReason: string;
+  location: string | null;
+  extractor: string;
+  notices: string[];
+}): Promise<void> {
+  if (searchLogUnavailable) return;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+
+  try {
+    const { error } = await supabaseAdmin.from("search_queries_log").insert({
+      query: payload.query.slice(0, 500),
+      specialty: payload.specialty,
+      specialty_confidence: payload.specialtyConfidence,
+      specialty_reason: payload.specialtyReason.slice(0, 500),
+      location: payload.location,
+      extractor: payload.extractor,
+      notices: payload.notices,
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      // 42P01 = undefined_table, PGRST205 = table not exposed via PostgREST.
+      const missing =
+        error.code === "42P01" ||
+        error.code === "PGRST205" ||
+        /does not exist|not found/i.test(error.message);
+      if (missing) {
+        searchLogUnavailable = true;
+        console.warn(
+          "[search-log] `search_queries_log` table not found; query logging disabled for this instance."
+        );
+      } else {
+        console.warn(`[search-log] insert failed: ${error.message}`);
+      }
+    }
+  } catch (err) {
+    console.warn(`[search-log] insert threw: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/* ── Main handler ───────────────────────────────────────────────────────────── */
+
+export async function POST(req: Request) {
+  const startedAt = Date.now();
+
+  try {
+    const body = (await req.json()) as { query?: unknown; locationContext?: unknown };
+    const query = typeof body.query === "string" ? body.query.trim() : "";
+    const locationContext =
+      typeof body.locationContext === "string" && body.locationContext.trim()
+        ? body.locationContext.trim()
+        : null;
+
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
-
-    let fullQuery = query;
-    if (locationContext) {
-      fullQuery += ` (User's detected location context: ${locationContext}. Use this to resolve "near me" or "nearby" queries to this specific city).`;
+    if (query.length > 500) {
+      return NextResponse.json({ error: "Query is too long" }, { status: 400 });
     }
 
-    // Collect all configured providers
-    const providers: { name: string; type: "aiml" | "openrouter" | "gemini" | "groq"; key: string }[] = [];
-    
-    // Groq first (primary provider — most reliable)
-    for (const [key, value] of Object.entries(process.env)) {
-      if (key.startsWith("GROQ_API_KEY") && value) {
-        providers.push({ name: key, type: "groq", key: value });
-      }
-    }
+    const deadline = startedAt + TOTAL_BUDGET_MS;
+    const remainingMs = () => deadline - Date.now();
 
-    // Then OpenRouter as fallback
-    for (const [key, value] of Object.entries(process.env)) {
-      if (key.startsWith("OPENROUTER_API_KEY") && value) {
-        providers.push({ name: key, type: "openrouter", key: value });
-      }
-    }
+    // The model sees the consented location so it can resolve "near me".
+    const fullQuery = locationContext
+      ? `${query} (The user's detected location is ${locationContext}. Resolve "near me"/"nearby" to that city.)`
+      : query;
 
-    // Then AIML API as a fallback
-    for (const [key, value] of Object.entries(process.env)) {
-      if (key.startsWith("AIML_API_KEY") && value) {
-        providers.push({ name: key, type: "aiml", key: value });
-      }
-    }
-    
-    // Add Gemini last
-    if (process.env.GEMINI_API_KEY) {
-      providers.push({ name: "GEMINI_API_KEY", type: "gemini", key: process.env.GEMINI_API_KEY });
-    }
+    const providers = collectProviders();
 
-    let result = null;
+    let modelExtraction: RawExtraction | null = null;
+    let extractor = "local rule engine";
 
     for (const provider of providers) {
+      if (remainingMs() <= 800) {
+        console.warn(`[NL] Budget exhausted before trying ${provider.name}; using local extraction.`);
+        break;
+      }
       try {
-        if (provider.type === "aiml") {
-          result = await callAimlApi(provider.key, fullQuery);
-        } else if (provider.type === "openrouter") {
-          result = await callOpenRouter(provider.key, fullQuery);
-        } else if (provider.type === "groq") {
-          result = await callGroq(provider.key, fullQuery);
-        } else if (provider.type === "gemini") {
-          const ai = new GoogleGenAI({ apiKey: provider.key });
-          result = await callGemini(ai, fullQuery);
+        modelExtraction =
+          provider.type === "gemini"
+            ? await callGemini(provider, fullQuery, remainingMs)
+            : await callOpenAiCompatible(provider, fullQuery, remainingMs);
+        extractor = provider.name;
+        break;
+      } catch (err) {
+        if (err instanceof JsonParseError || err instanceof ValidationError) {
+          console.warn(`[NL] ${provider.name} returned unusable JSON; trying next provider.`);
+          continue;
         }
-        
-        if (result) break; // Success! Exit the waterfall loop.
-      } catch (error) {
-        // Suppress warning during presentation
-        // console.warn(`[Fallback] ${provider.name} failed: ${error instanceof Error ? error.message : String(error)}. Proceeding to next provider...`);
+        console.warn(
+          `[NL] ${provider.name} failed: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
     }
 
-    if (result) {
-      return NextResponse.json({ filters: result.filters, explanation: { query, chips: result.chips } });
+    const local = localExtract(query);
+    const raw = mergeExtraction(local, modelExtraction);
+
+    const intent = buildSearchIntent(
+      { query, locationContext, extractor },
+      raw
+    );
+    const notices = buildTransparencyNotices(query, intent);
+
+    // Only bother logging the queries worth learning from.
+    if (intent.specialty.confidence === "low" || intent.specialty.confidence === "none") {
+      void logUnresolvedQuery({
+        query,
+        specialty: intent.specialty.value,
+        specialtyConfidence: intent.specialty.confidence,
+        specialtyReason: intent.specialty.reason,
+        location: intent.location.value,
+        extractor,
+        notices: notices.map((n) => n.id),
+      });
     }
 
-    // Provider 3: Local fallback
-    if (providers.length === 0) {
-      // console.warn("[Fallback] No AI API keys configured. Using local extraction.");
-    } else {
-      // console.warn("[Fallback] All AI providers failed. Using local extraction.");
-    }
-    
-    const localResult = localExtract(fullQuery);
-    return NextResponse.json({ filters: localResult.filters, explanation: { query, chips: localResult.chips, fallback: true } });
-
+    return NextResponse.json({
+      intent,
+      chips: intentToChips(intent),
+      notices,
+      explanation: {
+        query,
+        extractor,
+        usedLocalFallback: !modelExtraction,
+        wantsNearby: intent.wantsNearby || NEARBY_RE.test(query),
+        elapsed_ms: Date.now() - startedAt,
+      },
+    });
   } catch (error) {
-    console.error("[Main Route] Fatal Error:", error);
-    // Only return 500 if the entire request pipeline crashes (including fallback)
-    return NextResponse.json({ error: "Failed to process query" }, { status: 500 });
+    console.error("[NL] Fatal error:", error);
+    return NextResponse.json(
+      { error: "Failed to process query" },
+      { status: 500 }
+    );
   }
+}
+
+function collectProviders(): Provider[] {
+  const providers: Provider[] = [];
+
+  // Single pass over process.env — three separate loops did the same work 3×.
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!value) continue;
+    if (key.startsWith("GROQ_API_KEY")) {
+      providers.push({ name: key, type: "openai-compatible", key: value,
+        baseUrl: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-20b", headers: {} });
+    } else if (key.startsWith("OPENROUTER_API_KEY")) {
+      providers.push({ name: key, type: "openai-compatible", key: value,
+        baseUrl: "https://openrouter.ai/api/v1", model: "qwen/qwen3.8-27b:free",
+        headers: { "HTTP-Referer": "https://curanav.vercel.app", "X-Title": "CuraNav" } });
+    } else if (key.startsWith("AIML_API_KEY")) {
+      providers.push({ name: key, type: "openai-compatible", key: value,
+        baseUrl: "https://api.aimlapi.com/v1", model: "gpt-4o", headers: {} });
+    }
+  }
+
+  if (process.env.GEMINI_API_KEY) {
+    providers.push({
+      name: "GEMINI_API_KEY",
+      type: "gemini",
+      key: process.env.GEMINI_API_KEY,
+      baseUrl: "",
+      model: "gemini-3.6-flash",
+      headers: {},
+    });
+  }
+
+  return providers;
 }

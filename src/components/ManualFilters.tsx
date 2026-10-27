@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Filter, Search, Info } from "lucide-react";
+import { Filter, Search, Info, AlertTriangle } from "lucide-react";
 import { getEstimatedCost } from "@/lib/costEstimator";
+import {
+  CANONICAL_FACILITIES,
+  CANONICAL_SPECIALTIES,
+  normalizeFacilities,
+  normalizeExplicitSpecialty,
+  resolveSpecialtyHint,
+} from "@/lib/specialties";
 
 interface ManualFiltersProps {
   initiallyOpen?: boolean;
@@ -20,53 +27,57 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
   const [budget, setBudget] = useState(searchParams.get("max_budget") || "");
   const [minBudget, setMinBudget] = useState(searchParams.get("min_budget") || "");
   const [radiusKm, setRadiusKm] = useState(searchParams.get("radius_km") || "");
-  
-  const initialFacilities = searchParams.get("facilities")?.split(",") || [];
-  const [facilities, setFacilities] = useState({
-    ICU: initialFacilities.includes("ICU"),
-    Emergency: initialFacilities.includes("Emergency"),
-    Dialysis: initialFacilities.includes("Dialysis"),
-    NICU: initialFacilities.includes("NICU"),
-  });
+
+  // Facilities are held as canonical dataset values, not display labels, so the
+  // URL always carries something the API can actually match. A hand-written
+  // list previously sent "Emergency" and "Dialysis", which are not column
+  // values, so those filters were silently ignored by the API.
+  const initialFacilities = useState<string[]>(
+    () => normalizeFacilities(searchParams.get("facilities")) ?? []
+  )[0];
+  const [facilities, setFacilities] = useState<string[]>(initialFacilities);
 
   const suggestedCost = specialty ? getEstimatedCost(specialty) : null;
 
+  /**
+   * Suggest a specialty from the free-text condition, but only when the user has
+   * not already chosen one. The previous version ran on every keystroke and
+   * overwrote the Specialty field, and its hand-written table emitted values
+   * that do not exist in the dataset ("Dentistry", "Gynecology") — filters that
+   * quietly returned the whole index.
+   */
   useEffect(() => {
-    const q = condition.toLowerCase();
-    if (!q) return;
-    if (q.includes("heart") || q.includes("cardiac") || q.includes("cardio")) setSpecialty("Cardiology");
-    else if (q.includes("kidney") || q.includes("dialysis") || q.includes("renal")) setSpecialty("Nephrology");
-    else if (q.includes("cancer") || q.includes("tumor") || q.includes("oncol") || q.includes("chemo")) setSpecialty("Oncology");
-    else if (q.includes("bone") || q.includes("joint") || q.includes("ortho") || q.includes("fracture")) setSpecialty("Orthopedics");
-    else if (q.includes("brain") || q.includes("neuro") || q.includes("stroke") || q.includes("nerve")) setSpecialty("Neurology");
-    else if (q.includes("child") || q.includes("pediatric") || q.includes("baby") || q.includes("infant")) setSpecialty("Pediatrics");
-    else if (q.includes("eye") || q.includes("vision") || q.includes("cataract") || q.includes("opthal")) setSpecialty("Ophthalmology");
-    else if (q.includes("skin") || q.includes("derma") || q.includes("acne")) setSpecialty("Dermatology");
-    else if (q.includes("tooth") || q.includes("teeth") || q.includes("dental") || q.includes("dentist")) setSpecialty("Dentistry");
-    else if (q.includes("stomach") || q.includes("digest") || q.includes("gastro")) setSpecialty("Gastroenterology");
-    else if (q.includes("lung") || q.includes("breath") || q.includes("asthma") || q.includes("pulmo")) setSpecialty("Pulmonology");
-    else if (q.includes("women") || q.includes("pregnan") || q.includes("matern") || q.includes("gyne")) setSpecialty("Gynecology");
-  }, [condition]);
-  
+    if (specialty.trim()) return;
+    const hint = resolveSpecialtyHint(condition);
+    if (hint && hint.specialties.length > 0) {
+      setSpecialty(hint.specialties[0]);
+    }
+  }, [condition, specialty]);
+
+  // Surface an unresolvable specialty instead of passing it through to the API.
+  const specialtyInput = specialty.trim();
+  const resolvedSpecialty = specialtyInput
+    ? normalizeExplicitSpecialty(specialtyInput)
+    : null;
+  const specialtyIsUnmatched = specialtyInput.length > 0 && !resolvedSpecialty;
+
   const [isOpen, setIsOpen] = useState(initiallyOpen);
 
   const handleApply = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
-    
+
     if (city.trim()) params.set("city", city.trim());
     if (condition.trim()) params.set("condition", condition.trim());
-    if (specialty.trim()) params.set("specialty", specialty.trim());
+    // `normalizeExplicitSpecialty` already returns the comma-joined dataset
+    // values in URL form, or null when the text is not a real specialty.
+    if (resolvedSpecialty) params.set("specialty", resolvedSpecialty);
     if (budget.trim()) params.set("max_budget", budget.trim());
     if (minBudget.trim()) params.set("min_budget", minBudget.trim());
     if (radiusKm.trim()) params.set("radius_km", radiusKm.trim());
 
-    const selectedFacilities = Object.entries(facilities)
-      .filter(([_, isSelected]) => isSelected)
-      .map(([fac]) => fac);
-      
-    if (selectedFacilities.length > 0) {
-      params.set("facilities", selectedFacilities.join(","));
+    if (facilities.length > 0) {
+      params.set("facilities", facilities.join(","));
     }
 
     router.push(`${pathname}?${params.toString()}`);
@@ -79,17 +90,14 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
     setBudget("");
     setMinBudget("");
     setRadiusKm("");
-    setFacilities({
-      ICU: false,
-      Emergency: false,
-      Dialysis: false,
-      NICU: false,
-    });
+    setFacilities([]);
     router.push(pathname);
   };
 
-  const handleFacilityChange = (fac: keyof typeof facilities) => {
-    setFacilities(prev => ({ ...prev, [fac]: !prev[fac] }));
+  const toggleFacility = (fac: string) => {
+    setFacilities((prev) =>
+      prev.includes(fac) ? prev.filter((f) => f !== fac) : [...prev, fac]
+    );
   };
 
   return (
@@ -134,13 +142,28 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
 
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Specialty</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={specialty}
                 onChange={(e) => setSpecialty(e.target.value)}
                 placeholder="e.g. Cardiology"
+                list="manual-specialty-options"
                 className="w-full px-4 py-2.5 bg-background/80 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
               />
+              <datalist id="manual-specialty-options">
+                {CANONICAL_SPECIALTIES.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+              {specialtyIsUnmatched && (
+                <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-amber-300 leading-tight">
+                    &ldquo;{specialtyInput}&rdquo; is not a specialty in the index, so it
+                    will be ignored. Search results will not be narrowed by it.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -186,11 +209,11 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
           <div className="space-y-2">
              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Required Facilities</label>
              <div className="flex flex-wrap gap-2">
-                {Object.keys(facilities).map((fac) => (
+                {CANONICAL_FACILITIES.map((fac) => (
                   <label
                     key={fac}
                     className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${
-                      facilities[fac as keyof typeof facilities]
+                      facilities.includes(fac)
                         ? "bg-primary/10 border-primary text-primary font-semibold"
                         : "bg-background/50 border-white/10 text-muted-foreground hover:border-white/20 hover:bg-white/5"
                     }`}
@@ -198,13 +221,19 @@ export function ManualFilters({ initiallyOpen = false }: ManualFiltersProps = {}
                     <input
                       type="checkbox"
                       className="sr-only"
-                      checked={facilities[fac as keyof typeof facilities]}
-                      onChange={() => handleFacilityChange(fac as keyof typeof facilities)}
+                      checked={facilities.includes(fac)}
+                      onChange={() => toggleFacility(fac)}
                     />
                     <span className="text-sm">{fac}</span>
                   </label>
                 ))}
              </div>
+             {facilities.length > 1 && (
+               <p className="text-xs text-amber-300/90">
+                 Facilities are combined with AND, so a hospital must list all{" "}
+                 {facilities.length} to appear.
+               </p>
+             )}
           </div>
 
           <div className="flex gap-3 justify-end border-t border-white/10 pt-4">

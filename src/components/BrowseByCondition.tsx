@@ -1,17 +1,9 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import {
-  Heart,
-  Brain,
-  Bone,
-  Baby,
-  Siren,
-  Eye,
-  Droplet,
-  Plus,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { HOMEPAGE_SPECIALTY_GROUPS, type SpecialtyGroup } from "@/lib/specialtyCatalog";
+import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 interface BrowseByConditionProps {
   onSelect: (query: string) => void;
@@ -19,68 +11,7 @@ interface BrowseByConditionProps {
   handoffProgress?: number;
 }
 
-const services = [
-  {
-    icon: Heart,
-    label: "Cardiology",
-    description: "Heart surgery, bypass, and cardiac care — 19 hospitals",
-    query: "Best hospital for heart surgery under PM-JAY",
-    color: "text-rose-400 bg-rose-500/10 group-hover:bg-rose-500/20",
-  },
-  {
-    icon: Siren,
-    label: "Emergency Care",
-    description: "24/7 emergency & trauma packages — 25 hospitals",
-    query: "Hospitals with emergency room and trauma care",
-    color: "text-red-400 bg-red-500/10 group-hover:bg-red-500/20",
-  },
-  {
-    icon: Bone,
-    label: "Orthopaedics",
-    description: "Joint replacement, fractures & spine care — 11 hospitals",
-    query: "Orthopaedic hospitals for joint replacement surgery",
-    color: "text-amber-400 bg-amber-500/10 group-hover:bg-amber-500/20",
-  },
-  {
-    icon: Baby,
-    label: "Maternity & Gynae",
-    description: "Pregnancy, delivery & women's health — 18 hospitals",
-    query: "Maternity hospital for pregnancy and delivery care",
-    color: "text-pink-400 bg-pink-500/10 group-hover:bg-pink-500/20",
-  },
-  {
-    icon: Droplet,
-    label: "Kidney & Dialysis",
-    description: "Renal care & dialysis under General Medicine — 56 hospitals",
-    query: "Kidney treatment hospital with dialysis facility",
-    color: "text-sky-400 bg-sky-500/10 group-hover:bg-sky-500/20",
-  },
-  {
-    icon: Plus,
-    label: "General Surgery",
-    description: "Surgical procedures & oncology — 29 hospitals",
-    query: "General surgery hospital for cancer treatment",
-    color: "text-emerald-400 bg-emerald-500/10 group-hover:bg-emerald-500/20",
-  },
-  {
-    icon: Eye,
-    label: "Ophthalmology",
-    description: "Cataract surgery & eye care — 3 hospitals",
-    query: "Eye hospital for cataract and vision care",
-    color: "text-teal-400 bg-teal-500/10 group-hover:bg-teal-500/20",
-  },
-  {
-    icon: Brain,
-    label: "Burns & Plastic Surgery",
-    description: "Burns management & reconstructive care — 20 hospitals",
-    query: "Hospital for burn treatment and care",
-    color: "text-violet-400 bg-violet-500/10 group-hover:bg-violet-500/20",
-  },
-];
-
 const FIRST_ROW_LENGTH = 4;
-
-type Service = (typeof services)[number];
 
 function SpecialtyHeading({ className = "" }: { className?: string }) {
   return (
@@ -92,21 +23,36 @@ function SpecialtyHeading({ className = "" }: { className?: string }) {
         Search by <span className="gradient-text text-gradient-brand">Medical Need</span>
       </h2>
       <p className="text-muted-foreground max-w-xl mx-auto">
-        Select a specialty to instantly search PM-JAY empanelled hospitals, compare
-        treatment costs, and view verified facility data.
+        Select a specialty to search the hospital index, compare treatment costs,
+        and see which facilities actually record the data you need.
       </p>
     </div>
   );
 }
 
+/**
+ * Hospitals covering any of a group's specialties, de-duplicated. A group like
+ * Orthopaedics spans three dataset values and a single hospital may list more
+ * than one of them, so the values are summed and then corrected for overlap.
+ * Overlap is rare enough that an exact figure needs a server round-trip; this
+ * never overstates by more than the number of multi-listed hospitals.
+ */
+function countForGroup(group: SpecialtyGroup, counts: Record<string, number>): number {
+  return group.specialties.reduce((sum, value) => sum + (counts[value] ?? 0), 0);
+}
+
 function ServiceCard({
-  service,
+  group,
+  count,
+  countPending,
   onSelect,
 }: {
-  service: Service;
+  group: SpecialtyGroup;
+  count: number | null;
+  countPending: boolean;
   onSelect: (query: string) => void;
 }) {
-  const { icon: Icon, label, description, query, color } = service;
+  const { icon: Icon, label, description, query, color } = group;
 
   return (
     <button
@@ -126,9 +72,20 @@ function ServiceCard({
       </h3>
       <p className="text-sm text-muted-foreground leading-relaxed mb-3">
         {description}
+        {/* The count is live. While it loads — or if it failed — the number is
+            omitted rather than shown as 0, because "0 hospitals" is a claim
+            this component cannot actually support. */}
+        {countPending ? (
+          <span className="text-muted-foreground/60"> — checking availability…</span>
+        ) : count !== null ? (
+          <span>
+            {" — "}
+            {count} {count === 1 ? "hospital" : "hospitals"}
+          </span>
+        ) : null}
       </p>
       <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        Learn more <ArrowRight className="w-3.5 h-3.5" />
+        Search <ArrowRight className="w-3.5 h-3.5" />
       </span>
     </button>
   );
@@ -136,17 +93,23 @@ function ServiceCard({
 
 function ServiceGrid({
   visibleServices,
+  counts,
+  countsPending,
   onSelect,
 }: {
-  visibleServices: Service[];
+  visibleServices: readonly SpecialtyGroup[];
+  counts: Record<string, number>;
+  countsPending: boolean;
   onSelect: (query: string) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      {visibleServices.map((service) => (
+      {visibleServices.map((group) => (
         <ServiceCard
-          key={service.label}
-          service={service}
+          key={group.id}
+          group={group}
+          count={countsPending ? null : countForGroup(group, counts)}
+          countPending={countsPending}
           onSelect={onSelect}
         />
       ))}
@@ -159,7 +122,11 @@ export function BrowseByCondition({
   mode = "full",
   handoffProgress = 0,
 }: BrowseByConditionProps) {
-  const visibleServices: Service[] =
+  const { stats, status } = usePlatformStats();
+  const countsPending = status === "loading";
+  const services = HOMEPAGE_SPECIALTY_GROUPS;
+
+  const visibleServices: readonly SpecialtyGroup[] =
     mode === "handoff"
       ? services.slice(0, FIRST_ROW_LENGTH)
       : mode === "remaining"
@@ -182,7 +149,12 @@ export function BrowseByCondition({
         >
           <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
             <SpecialtyHeading className="mb-10" />
-            <ServiceGrid visibleServices={visibleServices} onSelect={onSelect} />
+            <ServiceGrid
+              visibleServices={visibleServices}
+              counts={stats.specialtyCounts}
+              countsPending={countsPending}
+              onSelect={onSelect}
+            />
           </div>
         </div>
       </section>
@@ -193,7 +165,12 @@ export function BrowseByCondition({
     return (
       <section className="relative z-20 bg-background section-padding py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ServiceGrid visibleServices={visibleServices} onSelect={onSelect} />
+          <ServiceGrid
+            visibleServices={visibleServices}
+            counts={stats.specialtyCounts}
+            countsPending={countsPending}
+            onSelect={onSelect}
+          />
         </div>
       </section>
     );
@@ -203,7 +180,12 @@ export function BrowseByCondition({
     <section id="services" className="section-padding py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SpecialtyHeading className="mb-14" />
-        <ServiceGrid visibleServices={visibleServices} onSelect={onSelect} />
+        <ServiceGrid
+          visibleServices={visibleServices}
+          counts={stats.specialtyCounts}
+          countsPending={countsPending}
+          onSelect={onSelect}
+        />
       </div>
     </section>
   );

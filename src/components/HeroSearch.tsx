@@ -1,23 +1,51 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, Building2, Shield, Loader2, Filter, Stethoscope, Database, HeartPulse } from "lucide-react";
+import { Search, MapPin, Building2, Shield, Loader2, Filter, Stethoscope, Database, HeartPulse, AlertCircle, RefreshCw } from "lucide-react";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
 import { getStoredLocation, storeLocation, clearStoredLocation } from "@/lib/userLocation";
+import { getPositionWithDeadline, type Coords } from "@/lib/geolocation";
 
 interface HeroSearchProps {
   query: string;
   setQuery: (q: string) => void;
 }
 
+/** Bounds the location permission prompt; see `getPositionWithDeadline`. */
+const GEOLOCATION_TIMEOUT_MS = 8_000;
+
 export function HeroSearch({ query, setQuery }: HeroSearchProps) {
   const router = useRouter();
-  const { stats, loading: statsLoading } = usePlatformStats();
+  const { stats, status: statsStatus, retry: retryStats } = usePlatformStats();
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
+
+  const statsLoading = statsStatus === "loading";
+  const statsFailed = statsStatus === "error";
+
+  /** One place that builds the destination, so `q` is never dropped. */
+  const buildSearchHref = useCallback(
+    (override?: { label: string; coords: Coords }) => {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set("q", query.trim());
+      if (override) {
+        params.set("loc", override.label);
+        params.set("lat", override.coords.lat.toString());
+        params.set("lon", override.coords.lon.toString());
+      } else if (locationLabel) {
+        params.set("loc", locationLabel);
+        if (locationCoords) {
+          params.set("lat", locationCoords.lat.toString());
+          params.set("lon", locationCoords.lon.toString());
+        }
+      }
+      return `/search?${params.toString()}`;
+    },
+    [query, locationLabel, locationCoords]
+  );
 
   // Restore the user's previously saved location so it is sent with every search.
   useEffect(() => {
@@ -30,53 +58,27 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (query.trim()) {
-      const locationContext = locationLabel
-        ? `&loc=${encodeURIComponent(locationLabel)}`
-        : "";
-      const coordsContext = locationCoords
-        ? `&lat=${locationCoords.lat}&lon=${locationCoords.lon}`
-        : "";
-      router.push(`/search?q=${encodeURIComponent(query)}${locationContext}${coordsContext}`);
-    }
+    if (query.trim()) router.push(buildSearchHref());
   };
 
   const handleUseLocation = () => {
-    if (!navigator.geolocation) {
-      setLocError("Geolocation is not supported by your browser");
-      return;
-    }
     setLocating(true);
     setLocError(null);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
+    getPositionWithDeadline(GEOLOCATION_TIMEOUT_MS, 10_000)
+      .then(({ lat, lon }) => {
         const label = "Current location";
-        const coords = { lat: latitude, lon: longitude };
-
         setLocationLabel(label);
-        setLocationCoords(coords);
-        storeLocation({ ...coords, label });
-
-        const params = new URLSearchParams({
-          loc: label,
-          lat: latitude.toString(),
-          lon: longitude.toString(),
-        });
-
+        setLocationCoords({ lat, lon });
+        storeLocation({ lat, lon, label });
         setLocating(false);
-        router.push(`/search?${params.toString()}`);
-      },
-      (err) => {
+        // Carry the typed query through: locating was an addition to the
+        // search, not a replacement for it.
+        router.push(buildSearchHref({ label, coords: { lat, lon } }));
+      })
+      .catch((err: unknown) => {
         setLocating(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          setLocError("Location permission denied");
-        } else {
-          setLocError("Could not get your location");
-        }
-      },
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
+        setLocError(err instanceof Error ? err.message : "Could not get your location");
+      });
   };
 
   return (
@@ -102,7 +104,18 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
             </h1>
 
             <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mb-8">
-              Search {stats.totalHospitals > 0 ? `${stats.totalHospitals} PM-JAY empanelled hospitals` : 'hospitals'} across {stats.totalSpecialties > 0 ? `${stats.totalSpecialties} specialties` : 'specialties'}. Compare costs, outcomes, and certifications — powered by transparent AI.
+              {statsFailed ? (
+                <>
+                  Search verified hospitals by condition, treatment, budget and
+                  location &mdash; with transparent AI that shows exactly what it could and could not match.
+                </>
+              ) : (
+                <>
+                  Search {stats.totalHospitals > 0 ? `${stats.totalHospitals} verified hospitals` : "hospitals"}
+                  {" "}across {stats.totalSpecialties > 0 ? `${stats.totalSpecialties} specialties` : "specialties"}.
+                  Compare costs, outcomes, and certifications &mdash; powered by transparent AI.
+                </>
+              )}
             </p>
 
             {/* Search Bar */}
@@ -223,12 +236,19 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                     <div className="mb-2 flex items-center gap-2 text-primary">
                       <Building2 className="h-4 w-4" />
                       <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-200">
-                        Hospital Index
+                        Live Dataset
                       </span>
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-1">PM-JAY Network</h3>
+                    {/* Not "PM-JAY": this count covers every searchable row, most
+                        of which are not PM-JAY empanelled. The PM-JAY figure is
+                        the separate badge below. */}
+                    <h3 className="text-xl font-bold text-white mb-1">Hospital Index</h3>
                     <p className="text-sm text-slate-200">
-                      {statsLoading ? "Loading..." : `${stats.totalHospitals} hospitals · ${stats.totalSpecialties} specialties`}
+                      {statsLoading
+                        ? "Loading live counts…"
+                        : statsFailed
+                          ? "Live counts unavailable"
+                          : `${stats.totalHospitals} hospitals · ${stats.totalSpecialties} specialties`}
                     </p>
                   </div>
                 </div>
@@ -242,7 +262,9 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                   <Database className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-foreground">{statsLoading ? "..." : stats.withCostData}</p>
+                  <p className="text-lg font-bold text-foreground">
+                    {statsLoading ? "..." : statsFailed ? <span className="text-muted-foreground/60">&mdash;</span> : stats.withCostData}
+                  </p>
                   <p className="text-xs text-muted-foreground">With Cost Data</p>
                 </div>
               </div>
@@ -254,7 +276,9 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
                   <HeartPulse className="w-5 h-5 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-foreground">{statsLoading ? "..." : stats.pmjayEmpanelled}</p>
+                  <p className="text-lg font-bold text-foreground">
+                    {statsLoading ? "..." : statsFailed ? <span className="text-muted-foreground/60">&mdash;</span> : stats.pmjayEmpanelled}
+                  </p>
                   <p className="text-xs text-muted-foreground">PM-JAY Listed</p>
                 </div>
               </div>
@@ -264,12 +288,31 @@ export function HeroSearch({ query, setQuery }: HeroSearchProps) {
               <div className="flex items-center gap-2">
                 <Stethoscope className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium text-foreground">
-                  {statsLoading ? "Loading specialties..." : `${stats.totalSpecialties} medical specialties indexed`}
+                  {statsLoading
+                    ? "Loading specialties…"
+                    : statsFailed
+                      ? "Specialty counts unavailable"
+                      : `${stats.totalSpecialties} medical specialties indexed`}
                 </span>
               </div>
             </div>
           </div>
         </div>
+
+        {statsFailed && (
+          <p className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="w-3.5 h-3.5 text-warning" />
+            Live platform counts could not be loaded. Search still works.
+            <button
+              type="button"
+              onClick={retryStats}
+              className="inline-flex items-center gap-1 underline hover:text-foreground"
+            >
+              <RefreshCw className="w-3 h-3" />
+              try again
+            </button>
+          </p>
+        )}
       </div>
     </section>
   );

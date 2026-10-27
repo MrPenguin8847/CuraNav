@@ -1,25 +1,28 @@
 import Link from "next/link";
 import { Activity, Mail, Phone, MapPin } from "lucide-react";
+import { FOOTER_SPECIALTY_GROUPS, specialtyHref } from "@/lib/specialtyCatalog";
 
+/**
+ * Specialty links are generated from the catalog, not typed out here, so a
+ * footer link can never drift from the dataset the API actually filters on.
+ * The previous hardcoded list used `?q=` free text, which the search page then
+ * had to re-interpret; `specialtyHref` sends the exact dataset values instead.
+ */
 const footerLinks = {
-  Services: [
-    { label: "Cardiology", href: "/search?q=cardiology" },
-    { label: "Neurology", href: "/search?q=neurology" },
-    { label: "Orthopedics", href: "/search?q=orthopedics" },
-    { label: "Oncology", href: "/search?q=oncology" },
-    { label: "Nephrology", href: "/search?q=nephrology" },
-  ],
+  Services: FOOTER_SPECIALTY_GROUPS.map((group) => ({
+    label: group.label,
+    href: specialtyHref(group),
+  })),
   Company: [
-    { label: "About Us", href: "#how-it-works" },
-    { label: "Our Mission", href: "#" },
-    { label: "How It Works", href: "#how-it-works" },
-    { label: "Contact Us", href: "#" },
+    { label: "Our Mission", href: "/mission" },
+    { label: "How It Works", href: "/#how-it-works" },
+    { label: "Contact Us", href: "/contact" },
   ],
   Support: [
-    { label: "FAQ", href: "#faq" },
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
-    { label: "Disclaimer", href: "#" },
+    { label: "FAQ", href: "/#faq" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Disclaimer", href: "/disclaimer" },
   ],
 };
 
@@ -39,9 +42,10 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed mb-6 max-w-sm">
-              CuraNav helps you discover and compare PM-JAY empanelled hospitals using
-              transparent, AI-powered search backed by NHA data.
-              We don&apos;t diagnose or recommend — we inform.
+              CuraNav helps you search a hospital directory by specialty, location
+              and budget, and shows you exactly how each result was matched. We
+              don&apos;t diagnose, rate hospitals, or tell you which one to choose
+              &mdash; we inform.
             </p>
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm text-muted-foreground">

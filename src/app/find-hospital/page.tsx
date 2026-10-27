@@ -4,9 +4,20 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Search, MapPin, Stethoscope, IndianRupee, Activity, Loader2, Pill, Info } from "lucide-react";
+import { Search, MapPin, Stethoscope, IndianRupee, Activity, Loader2, Pill, Info, AlertTriangle } from "lucide-react";
 import { getEstimatedCost } from "@/lib/costEstimator";
 import { getStoredLocation, storeLocation } from "@/lib/userLocation";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { getPositionWithDeadline } from "@/lib/geolocation";
+import {
+  CANONICAL_FACILITIES,
+  CANONICAL_SPECIALTIES,
+  normalizeExplicitSpecialty,
+  resolveSpecialtyHint,
+} from "@/lib/specialties";
+
+/** Bounds the location permission prompt; see `getPositionWithDeadline`. */
+const GEOLOCATION_TIMEOUT_MS = 8_000;
 
 export default function FindHospitalPage() {
   const router = useRouter();
@@ -30,50 +41,48 @@ export default function FindHospitalPage() {
     }
   }, []);
 
-  // Basic facilities check
-  const [facilities, setFacilities] = useState({
-    ICU: false,
-    Emergency: false,
-    Dialysis: false,
-    NICU: false,
-  });
+  // Facilities are canonical dataset values, not display labels. The previous
+  // fixed `{ ICU, Emergency, Dialysis, NICU }` state sent "Emergency" and
+  // "Dialysis" to the API, neither of which is a `facilities[]` value, so those
+  // two filters were accepted by the form and then ignored by the search.
+  const [facilities, setFacilities] = useState<string[]>([]);
 
   const suggestedCost = specialty ? getEstimatedCost(specialty) : null;
 
+  /**
+   * Suggest a specialty from the free-text condition, but only when the user has
+   * not already picked one. The hand-written table this replaces emitted values
+   * that are not in the dataset ("Dentistry", "Gynecology") and overwrote the
+   * Specialty field on every keystroke.
+   */
   useEffect(() => {
-    const q = condition.toLowerCase();
-    if (!q) return;
-    if (q.includes("heart") || q.includes("cardiac") || q.includes("cardio")) setSpecialty("Cardiology");
-    else if (q.includes("kidney") || q.includes("dialysis") || q.includes("renal")) setSpecialty("Nephrology");
-    else if (q.includes("cancer") || q.includes("tumor") || q.includes("oncol") || q.includes("chemo")) setSpecialty("Oncology");
-    else if (q.includes("bone") || q.includes("joint") || q.includes("ortho") || q.includes("fracture")) setSpecialty("Orthopedics");
-    else if (q.includes("brain") || q.includes("neuro") || q.includes("stroke") || q.includes("nerve")) setSpecialty("Neurology");
-    else if (q.includes("child") || q.includes("pediatric") || q.includes("baby") || q.includes("infant")) setSpecialty("Pediatrics");
-    else if (q.includes("eye") || q.includes("vision") || q.includes("cataract") || q.includes("opthal")) setSpecialty("Ophthalmology");
-    else if (q.includes("skin") || q.includes("derma") || q.includes("acne")) setSpecialty("Dermatology");
-    else if (q.includes("tooth") || q.includes("teeth") || q.includes("dental") || q.includes("dentist")) setSpecialty("Dentistry");
-    else if (q.includes("stomach") || q.includes("digest") || q.includes("gastro")) setSpecialty("Gastroenterology");
-    else if (q.includes("lung") || q.includes("breath") || q.includes("asthma") || q.includes("pulmo")) setSpecialty("Pulmonology");
-    else if (q.includes("women") || q.includes("pregnan") || q.includes("matern") || q.includes("gyne")) setSpecialty("Gynecology");
-  }, [condition]);
+    if (specialty.trim()) return;
+    const hint = resolveSpecialtyHint(condition);
+    if (hint && hint.specialties.length > 0) {
+      setSpecialty(hint.specialties[0]);
+    }
+  }, [condition, specialty]);
+
+  // Surface an unresolvable specialty instead of passing it through to the API.
+  const specialtyInput = specialty.trim();
+  const resolvedSpecialty = specialtyInput
+    ? normalizeExplicitSpecialty(specialtyInput)
+    : null;
+  const specialtyIsUnmatched = specialtyInput.length > 0 && !resolvedSpecialty;
 
   const handleUseLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError("Location is not supported by your browser");
-      return;
-    }
-
     setLocating(true);
     setLocationError(null);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
+    // Bounded on the permission prompt too, so the button cannot hang.
+    getPositionWithDeadline(GEOLOCATION_TIMEOUT_MS, 10_000)
+      .then(async ({ lat: latitude, lon: longitude }) => {
         const coords = { lat: latitude, lon: longitude };
 
         try {
-          const res = await fetch(
+          const res = await fetchWithTimeout(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
-            { headers: { "User-Agent": "CuraNav/1.0" } }
+            { headers: { "User-Agent": "CuraNav/1.0" } },
+            3_000
           );
           if (!res.ok) throw new Error("Location lookup failed");
 
@@ -100,21 +109,17 @@ export default function FindHospitalPage() {
         } finally {
           setLocating(false);
         }
-      },
-      (error) => {
+      })
+      .catch((err: unknown) => {
         setLocating(false);
-        setLocationError(
-          error.code === error.PERMISSION_DENIED
-            ? "Location permission denied"
-            : "Could not get your location"
-        );
-      },
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
+        setLocationError(err instanceof Error ? err.message : "Could not get your location");
+      });
   };
 
-  const handleFacilityChange = (fac: keyof typeof facilities) => {
-    setFacilities(prev => ({ ...prev, [fac]: !prev[fac] }));
+  const toggleFacility = (fac: string) => {
+    setFacilities((prev) =>
+      prev.includes(fac) ? prev.filter((f) => f !== fac) : [...prev, fac]
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -134,15 +139,11 @@ export default function FindHospitalPage() {
     } else if (cityQuery) {
       params.set("city", cityQuery);
     }
-    if (specialty.trim()) params.set("specialty", specialty.trim());
+    if (resolvedSpecialty) params.set("specialty", resolvedSpecialty);
     if (maxBudget.trim()) params.set("max_budget", maxBudget.trim());
 
-    const selectedFacilities = Object.entries(facilities)
-      .filter(([_, isSelected]) => isSelected)
-      .map(([fac]) => fac);
-
-    if (selectedFacilities.length > 0) {
-      params.set("facilities", selectedFacilities.join(","));
+    if (facilities.length > 0) {
+      params.set("facilities", facilities.join(","));
     }
 
     router.push(`/search?${params.toString()}`);
@@ -233,11 +234,26 @@ export default function FindHospitalPage() {
                   id="specialty"
                   name="specialty"
                   type="text"
+                  list="find-hospital-specialty-options"
                   value={specialty}
                   onChange={(e) => setSpecialty(e.target.value)}
-                  placeholder="e.g. Cardiology, Orthopedics"
+                  placeholder="e.g. Cardiology, Orthopaedics"
                   className="w-full px-4 py-3 bg-background/50 border border-white/10 rounded-xl text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                 />
+                <datalist id="find-hospital-specialty-options">
+                  {CANONICAL_SPECIALTIES.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+                {specialtyIsUnmatched && (
+                  <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-amber-300">
+                      &ldquo;{specialtyInput}&rdquo; is not a specialty in the index, so it
+                      will be ignored and results will not be narrowed by it.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -274,10 +290,10 @@ export default function FindHospitalPage() {
                 Required Facilities
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {Object.keys(facilities).map((fac) => (
+                {CANONICAL_FACILITIES.map((fac) => (
                   <label
                     key={fac}
-                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${facilities[fac as keyof typeof facilities]
+                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all text-center ${facilities.includes(fac)
                         ? "bg-primary/10 border-primary text-primary font-semibold"
                         : "bg-background/50 border-white/10 text-muted-foreground hover:border-white/20 hover:bg-white/5"
                       }`}
@@ -285,13 +301,19 @@ export default function FindHospitalPage() {
                     <input
                       type="checkbox"
                       className="sr-only"
-                      checked={facilities[fac as keyof typeof facilities]}
-                      onChange={() => handleFacilityChange(fac as keyof typeof facilities)}
+                      checked={facilities.includes(fac)}
+                      onChange={() => toggleFacility(fac)}
                     />
                     <span className="text-sm">{fac}</span>
                   </label>
                 ))}
               </div>
+              {facilities.length > 1 && (
+                <p className="text-xs text-amber-300/90">
+                  Facilities are combined with AND, so a hospital must list all{" "}
+                  {facilities.length} to appear.
+                </p>
+              )}
             </div>
 
             <div className="pt-6">

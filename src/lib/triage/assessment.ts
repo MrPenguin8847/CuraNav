@@ -1,6 +1,7 @@
 import { detectRedFlags, type RedFlagMatch } from "./redFlags";
 import { scoreClusters, getCluster, FALLBACK_CLUSTER_ID, type Cluster } from "./clusters";
 import { resolveCare } from "./homeCare";
+import { isCanonicalSpecialty } from "@/lib/specialties";
 import {
   adjustForAge,
   adjustForDuration,
@@ -134,17 +135,23 @@ export function assess(input: TriageInput, advisor: TriageAdvisor): TriageResult
   }
 
   // ── Specialties: clusters first, then the model, deduplicated ─────────────
+  // Only values that exist in the hospital index survive. A triage result that
+  // suggests "Antenatal Care" hands the search page a specialty the API cannot
+  // match, and the API responds by dropping the filter entirely — the user sees
+  // unfiltered results presented as targeted ones.
   const clusterSpecialties = clusters.flatMap((c) => [...c.specialties]);
   const specialtySet: string[] = [];
   for (const s of [...clusterSpecialties, ...advisor.suggestedSpecialties]) {
-    if (!specialtySet.includes(s)) specialtySet.push(s);
+    if (isCanonicalSpecialty(s) && !specialtySet.includes(s)) specialtySet.push(s);
   }
   const suggestedSpecialties = specialtySet.slice(0, 4);
 
   if (flags.length > 0) {
     // Emergency referrals must land on an emergency-capable department even if
-    // the cluster map said otherwise.
-    for (const s of ["Emergency Medicine", "Emergency Stabilization", "Critical Care"]) {
+    // the cluster map said otherwise. These are the dataset's emergency values;
+    // "Emergency Stabilization" was not one of them, so it silently widened the
+    // search instead of narrowing it.
+    for (const s of ["Emergency Medicine", "Emergency Room Packages", "Critical Care", "Trauma Care"]) {
       if (!suggestedSpecialties.includes(s)) suggestedSpecialties.push(s);
     }
   }

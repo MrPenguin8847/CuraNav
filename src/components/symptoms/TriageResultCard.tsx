@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { SEVERITY_LABEL, SEVERITY_TOKEN, type Severity, type TriageResult } from "@/lib/triage/types";
 import { getCluster } from "@/lib/triage/clusters";
+import { normalizeExplicitSpecialty } from "@/lib/specialties";
 
 type Props = {
   result: TriageResult;
@@ -187,16 +188,30 @@ export function TriageResultCard({ result, onRestart }: Props) {
         )}
 
         <div className="mt-5 pt-5 border-t border-white/10 flex flex-wrap items-center gap-2.5">
-          <Link
-            href={
-              result.specialtyQuery
-                ? `/search?specialty=${encodeURIComponent(result.specialtyQuery)}`
-                : "/search"
-            }
-            className="btn-primary text-sm px-5 py-2.5"
-          >
-            Find hospitals for this
-          </Link>
+          {/* Normalised here as well as in the triage engine: the search API
+              discards a `specialty=` value it cannot resolve, so an unresolved
+              list would silently widen the search instead of targeting it. */}
+          {(() => {
+            const specialtyParam = normalizeExplicitSpecialty(result.specialtyQuery);
+            const params = new URLSearchParams();
+            if (specialtyParam) params.set("specialty", specialtyParam);
+            params.set("urgency", result.severity);
+            const href = `/search?${params.toString()}`;
+
+            return (
+              <>
+                <Link href={href} className="btn-primary text-sm px-5 py-2.5">
+                  Find hospitals for this
+                </Link>
+                {specialtyParam ? null : (
+                  <p className="w-full text-xs text-muted-foreground">
+                    We could not map this to a specialty in our index, so the
+                    results will not be filtered by specialty.
+                  </p>
+                )}
+              </>
+            );
+          })()}
           <button
             type="button"
             onClick={onRestart}
