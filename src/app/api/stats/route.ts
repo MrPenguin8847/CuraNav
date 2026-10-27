@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { CANONICAL_SPECIALTIES, normalizeExplicitSpecialty } from "@/lib/specialties";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 /**
  * GET /api/stats
@@ -21,7 +22,14 @@ import { CANONICAL_SPECIALTIES, normalizeExplicitSpecialty } from "@/lib/special
  *                         filtering on it returns zero rows and blanks the
  *                         homepage.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Rate limit: 30 requests / minute per IP
+  const ip = getClientIp(req);
+  const limit = rateLimit(`stats:${ip}`, { max: 30, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const { data: hospitals, error } = await supabaseAdmin
       .from("hospitals")

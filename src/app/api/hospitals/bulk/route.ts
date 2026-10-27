@@ -1,30 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createServerClient } from "@/lib/supabase-server";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
-// Helper to safely parse string to array
-const parseArray = (val: any): string[] => {
+/** Maximum number of hospitals accepted in a single bulk upload. */
+const MAX_BULK_SIZE = 200;
+
+// Helper to safely parse a value to a string array.
+const parseArray = (val: unknown): string[] => {
   if (!val) return [];
-  if (Array.isArray(val)) return val;
+  if (Array.isArray(val)) return (val as unknown[]).map(String);
   if (typeof val === "string") {
-    // If it looks like a JSON array string "['A', 'B']" or '["A", "B"]'
     if (val.startsWith("[") && val.endsWith("]")) {
       try {
-        // Papaparse might give us Python-style arrays if the CSV had them. 
-        // We do a quick replace of single quotes to double quotes for JSON.parse
         const jsonStr = val.replace(/'/g, '"');
-        return JSON.parse(jsonStr);
-      } catch (e) {
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch {
         // Fallback to split
       }
     }
-    // Fallback to comma separated
-    return val.split(",").map(s => s.trim()).filter(Boolean);
+    return val.split(",").map((s) => s.trim()).filter(Boolean);
   }
   return [];
 };
 
 export async function POST(req: NextRequest) {
+  // ── Rate limiting: 10 bulk uploads per hour per IP ──────────────────────
+  const ip = getClientIp(req);
+  const limit = rateLimit(`hospitals-bulk:${ip}`, { max: 10, windowMs: 60 * 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many bulk upload requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   try {
     const supabase = await createServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -33,54 +44,78 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
 
-    const { hospitals } = await req.json();
+    const body = (await req.json()) as { hospitals?: unknown };
+    const hospitals = body.hospitals;
 
     if (!Array.isArray(hospitals) || hospitals.length === 0) {
       return NextResponse.json({ error: "No hospitals provided" }, { status: 400 });
     }
 
+    if (hospitals.length > MAX_BULK_SIZE) {
+      return NextResponse.json(
+        { error: `Bulk upload is limited to ${MAX_BULK_SIZE} hospitals per request.` },
+        { status: 400 }
+      );
+    }
+
     // Map CSV rows to our database schema
-    const rowsToInsert = hospitals.map((row: any, index: number) => {
-      // Create a normalized object with lowercase keys to easily map standard vs NHA CSV formats
-      const normalized: Record<string, any> = {};
-      for (const [key, value] of Object.entries(row)) {
+    const rowsToInsert = hospitals.map((row: unknown, index: number) => {
+      const rawRow = row as Record<string, unknown>;
+      // Create a normalized object with lowercase keys
+      const normalized: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(rawRow)) {
         normalized[key.toLowerCase().trim()] = value;
       }
 
+      const str = (v: unknown): string | null =>
+        typeof v === "string" && v.trim() ? v.trim() : null;
+      const num = (v: unknown): number | null => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+
       // Generate a unique ID if one doesn't exist
-      const hospitalId = 
-        normalized.hospital_id || 
-        normalized.id || 
-        `HOSP_CSV_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${index}`;
+      const hospitalId =
+        str(normalized.hospital_id) ||
+        str(normalized.id) ||
+        `HOSP_CSV_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${index}`;
 
       return {
         hospital_id: hospitalId,
-        name: normalized.name || normalized['hospital name'] || "Unknown Hospital",
-        city: normalized.city || normalized['district name'] || null,
-        state: normalized.state || normalized['state name'] || null,
-        pincode: normalized.pincode || null,
-        address: normalized.address || normalized['hospital address'] || [normalized.city, normalized.state].filter(Boolean).join(", ") || "Address not provided",
-        latitude: parseFloat(normalized.latitude) || null,
-        longitude: parseFloat(normalized.longitude) || null,
-        specialties: parseArray(normalized.specialties || normalized['specialities empaneled']),
+        name: str(normalized.name) || str(normalized["hospital name"]) || "Unknown Hospital",
+        city: str(normalized.city) || str(normalized["district name"]),
+        state: str(normalized.state) || str(normalized["state name"]),
+        pincode: str(normalized.pincode),
+        address:
+          str(normalized.address) ||
+          str(normalized["hospital address"]) ||
+          [str(normalized.city), str(normalized.state)].filter(Boolean).join(", ") ||
+          "Address not provided",
+        latitude: num(normalized.latitude),
+        longitude: num(normalized.longitude),
+        specialties: parseArray(normalized.specialties || normalized["specialities empaneled"]),
         procedures: parseArray(normalized.procedures),
-        cost_min: parseInt(normalized.cost_min) || null,
-        cost_max: parseInt(normalized.cost_max) || null,
-        currency: normalized.currency || "INR",
+        cost_min: num(normalized.cost_min),
+        cost_max: num(normalized.cost_max),
+        currency: str(normalized.currency) || "INR",
         facilities: parseArray(normalized.facilities),
         accreditation: parseArray(normalized.accreditation),
-        pmjay_empanelled: normalized.pmjay_empanelled === "true" || normalized.pmjay_empanelled === true || !!normalized['hospital type'],
-        annual_procedure_volume: parseInt(normalized.annual_procedure_volume) || null,
-        outcome_metric: parseFloat(normalized.outcome_metric) || null,
-        icu_beds: parseInt(normalized.icu_beds) || null,
-        source_type: normalized.source_type || "csv_upload",
-        verification_status: normalized.verification_status || "official",
-        source_url: normalized.source_url || null,
-        condition_tag: normalized.condition_tag || null,
-        review_status: normalized.review_status || "approved", // auto-approve admin uploads by default
-        phone: normalized.phone || normalized['contact number'] || null,
-        facility_type: normalized.facility_type || normalized['hospital type'] || null,
-        date_of_establishment: normalized.date_of_establishment || null,
+        pmjay_empanelled:
+          normalized.pmjay_empanelled === "true" ||
+          normalized.pmjay_empanelled === true ||
+          !!normalized["hospital type"],
+        annual_procedure_volume: num(normalized.annual_procedure_volume),
+        outcome_metric: num(normalized.outcome_metric),
+        icu_beds: num(normalized.icu_beds),
+        source_type: str(normalized.source_type) || "csv_upload",
+        // CSV uploads come from admins but treat as pending so a second admin can approve.
+        verification_status: str(normalized.verification_status) || "official",
+        source_url: str(normalized.source_url),
+        condition_tag: str(normalized.condition_tag),
+        review_status: "pending", // require explicit approval even for admin CSV uploads
+        phone: str(normalized.phone) || str(normalized["contact number"]),
+        facility_type: str(normalized.facility_type) || str(normalized["hospital type"]),
+        date_of_establishment: str(normalized.date_of_establishment),
       };
     });
 
@@ -95,8 +130,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, count: data.length });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal server error";
     console.error("[POST /api/hospitals/bulk] Catch error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

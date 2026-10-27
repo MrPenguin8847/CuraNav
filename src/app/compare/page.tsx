@@ -25,7 +25,16 @@ import { Hospital } from "@/lib/mockHospitals";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Lightweight markdown → styled HTML for the AI summary. */
+/**
+ * Lightweight markdown → styled HTML for the AI summary panel.
+ *
+ * XSS safety: the function starts by escaping ALL `&`, `<`, and `>` in the
+ * raw AI-model text into HTML entities. Every subsequent `.replace()` only
+ * injects literal, hard-coded HTML tag strings — the $1 capture groups that
+ * land inside those tags already have their angle brackets entity-escaped and
+ * therefore cannot carry injected markup. The final string is safe to assign
+ * to `dangerouslySetInnerHTML`.
+ */
 function renderMarkdown(md: string): string {
   const escaped = md
     .replace(/&/g, "&amp;")

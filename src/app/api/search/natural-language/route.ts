@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { supabaseAdmin } from "@/lib/supabase";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import {
@@ -447,6 +448,23 @@ async function logUnresolvedQuery(payload: {
 
 export async function POST(req: Request) {
   const startedAt = Date.now();
+
+  // ── Rate limiting: 20 requests / minute per IP ───────────────────────────
+  const ip = getClientIp(req);
+  const limit = rateLimit(`nl-search:${ip}`, { max: 20, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a moment before searching again." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)),
+          "X-RateLimit-Limit": "20",
+          "X-RateLimit-Remaining": "0",
+        },
+      }
+    );
+  }
 
   try {
     const body = (await req.json()) as { query?: unknown; locationContext?: unknown };

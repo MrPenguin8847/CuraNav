@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createServerClient } from "@/lib/supabase-server";
 import { mapHospital } from "@/lib/mapHospital";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 /**
  * GET /api/hospitals/[id]
@@ -53,6 +54,12 @@ export async function PATCH(
 ) {
   const { id } = await params;
 
+  // Rate limit: 30 mutations per minute per IP
+  const ipLimit = rateLimit(`hospital-mutate:${getClientIp(req)}`, { max: 30, windowMs: 60_000 });
+  if (!ipLimit.ok) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const supabase = await createServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -64,9 +71,9 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
+    const body = await req.json() as { reviewStatus?: string; verificationStatus?: string };
     const { reviewStatus, verificationStatus } = body;
-    const updateData: any = {};
+    const updateData: Record<string, string> = {};
 
     if (reviewStatus) {
       if (!['pending', 'approved', 'rejected'].includes(reviewStatus)) {
@@ -114,6 +121,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Rate limit: 30 mutations per minute per IP
+  const ipLimit = rateLimit(`hospital-mutate:${getClientIp(req)}`, { max: 30, windowMs: 60_000 });
+  if (!ipLimit.ok) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   try {
     const supabase = await createServerClient();

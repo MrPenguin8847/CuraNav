@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { createServerClient } from "@/lib/supabase-server";
 import { mapHospital } from "@/lib/mapHospital";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import {
   hasExactMatches,
   scoreAll,
@@ -118,6 +119,16 @@ function parseBudgetParam(raw: string | null): number | null {
  * instead of showing a bare zero-result page.
  */
 export async function GET(req: NextRequest) {
+  // ── Rate limiting: 60 requests / minute per IP ───────────────────────────
+  const ip = getClientIp(req);
+  const limit = rateLimit(`hospitals-get:${ip}`, { max: 60, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait before searching again." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   const { searchParams } = req.nextUrl;
 
   const city = searchParams.get("city");
@@ -131,18 +142,21 @@ export async function GET(req: NextRequest) {
   const facilitiesParam = searchParams.get("facilities");
   const verifiedOnly = searchParams.get("verified_only") === "true";
   const sortParam = searchParams.get("sort") ?? "match";
-  const isAdmin = searchParams.get("admin") === "true";
 
-  if (isAdmin) {
+  // ── Admin access: ALWAYS verify session server-side; never trust a query param ──
+  // The ?admin=true param is only a *request* for admin mode — the actual
+  // decision is made by inspecting the Supabase session here.
+  let isAdmin = false;
+  if (searchParams.get("admin") === "true") {
     const supabase = await createServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json(
         { error: "Unauthorized access" },
         { status: 401 }
       );
     }
+    isAdmin = true;
   }
 
   const filtersApplied: Record<string, string | number | boolean | string[]> = {};

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { mapHospital } from "@/lib/mapHospital";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 /**
  * POST /api/compare/ai
@@ -10,9 +11,19 @@ import { mapHospital } from "@/lib/mapHospital";
  * Returns a streaming AI-generated comparison summary for the selected hospitals.
  */
 export async function POST(req: NextRequest) {
+  // ── Rate limiting: 10 comparisons / minute per IP ───────────────────────
+  const ip = getClientIp(req);
+  const limit = rateLimit(`compare-ai:${ip}`, { max: 10, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many comparison requests. Please wait a moment." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   try {
-    const body = await req.json();
-    const ids: string[] = body.ids;
+    const body = (await req.json()) as { ids?: unknown };
+    const ids = body.ids;
 
     if (!Array.isArray(ids) || ids.length < 2) {
       return NextResponse.json(
@@ -111,7 +122,7 @@ IMPORTANT RULES:
     }
 
     let aiResponse: string | null = null;
-    let lastError: any = null;
+    let lastError: unknown = null;
 
     for (const provider of providers) {
       try {
@@ -186,8 +197,7 @@ IMPORTANT RULES:
         
         if (aiResponse) break; // Success! Exit waterfall loop.
       } catch (err) {
-        // Suppress console warnings during presentation
-        // console.warn(`[AI Compare] ${provider.name} failed: ${err instanceof Error ? err.message : String(err)}. Proceeding to next...`);
+        console.warn(`[AI Compare] ${provider.name} failed: ${err instanceof Error ? err.message : String(err)}. Proceeding to next...`);
         lastError = err;
       }
     }
